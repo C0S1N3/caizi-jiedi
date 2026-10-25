@@ -1,6 +1,6 @@
-# 猜字解底 · 计算器
+# 猜字解底 · 求解器
 
-A self-contained word-game calculator for **猜字解底** (guess the hidden character, then the central answer). No install, no network, no account — open the page and type.
+A self-contained word-game solver for **猜字解底** (guess the hidden character, then the central answer). No install, no network, no account — open the page and type.
 
 **Live demo:** https://c0sin3.github.io/caizi-jiedi/
 
