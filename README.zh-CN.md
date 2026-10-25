@@ -2,7 +2,7 @@
 
 A self-contained word-game solver for **猜字解底** (guess the hidden character, then the central answer). No install, no network, no account — open the page and type.
 
-**Live demo:** https://c0sin3.github.io/caizi-jiedi/
+**在线演示：** [GitHub Pages](https://c0sin3.github.io/caizi-jiedi/)
 
 [English README](README.md)
 
