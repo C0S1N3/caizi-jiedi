@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>qol panel refresh test</title></head>
+<body>
+<main class="cj-shell" data-phase="guess">
+  <span class="cj-room-code">#REFRESH</span>
+  <div class="cj-round"><strong>01 / 5</strong></div>
+  <div class="cj-progress">0 / 5 已完成</div>
+  <div class="cj-public"><strong>爱</strong></div>
+  <div class="cj-central"><strong>?</strong></div>
+  <div class="cj-secret"><strong>节</strong></div>
+  <div class="cj-score-player is-me"><span class="cj-score-name"><strong>cos（你）</strong></span><b>0</b></div>
+  <div class="cj-score-player"><span class="cj-score-name"><strong>Alfred草药</strong></span><b>0</b></div>
+  <div class="cj-clue-card">
+    <header><strong>Alfred草药</strong><span>猜字中</span></header>
+    <div class="cj-clue-face"><span>钟</span><span>亲</span></div>
+    <div class="cj-clue-foot">哪一个字，能分别与它们组词？</div>
+  </div>
+  <form class="cj-answer-form">
+    <input aria-label="作答卡 1"><input aria-label="作答卡 2"><input aria-label="作答卡 3">
+  </form>
+</main>
+<script src="./bgacn-qol.user.js"></script>
+<script>
+(function () {
+  var out = [];
+  function panelText() {
+    var p = document.getElementById("cj-qol-panel");
+    if (!p) return "NO PANEL";
+    var title = p.querySelector("[data-cj-title]");
+    return (title ? title.textContent : "?") + " | " +
+      (p.querySelector("[data-cj-stat]") ? p.querySelector("[data-cj-stat]").textContent : "?") +
+      " | rows=" + p.querySelectorAll("tbody tr, tr").length;
+  }
+
+  localStorage.removeItem("cj_qol_log_v1");
+  window.__cjQol.togglePanel();
+  out.push("panel-open=" + panelText());
+
+  // 改状态 → tick() 记新条目 → 面板应自动刷新
+  document.querySelector(".cj-progress").textContent = "1 / 5 已完成";
+  document.querySelector(".cj-answer-form input").value = "情";
+
+  setTimeout(function () {
+    out.push("after-change=" + panelText());
+    out.push("log=" + JSON.parse(localStorage.getItem("cj_qol_log_v1") || "[]").length);
+
+    // 关闭再打开，计数应保持
+    window.__cjQol.togglePanel();
+    out.push("closed=" + (document.getElementById("cj-qol-panel") ? "STILL THERE" : "removed"));
+    window.__cjQol.togglePanel();
+    out.push("reopen=" + panelText());
+
+    var d = document.createElement("div");
+    d.id = "qol-test-dump";
+    d.style.cssText = "position:fixed;left:0;top:0;z-index:999999;background:#111;color:#7c7;font:12px monospace;padding:6px;max-width:70vw;white-space:pre-wrap;";
+    d.textContent = out.join("\n");
+    document.body.appendChild(d);
+  }, 900);
+})();
+</script>
+</body>
+</html>

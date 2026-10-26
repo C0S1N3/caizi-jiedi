@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>qol stats test</title></head>
+<body>
+<script src="./bgacn-qol.user.js"></script>
+<script>
+(function () {
+  var FOOT = "哪一个字，能分别与它们组词？";
+  var card = function (player, status, clues, hidden) {
+    return { player: player, status: status, chars: clues.join("/"),
+      text: player + status + clues.join("") + hidden + FOOT };
+  };
+  var playersBefore = [
+    { name: "Alfred草药", me: false, score: "6" },
+    { name: "kndr", me: false, score: "8" },
+    { name: "小叮当", me: false, score: "7" },
+    { name: "cos", me: true, score: "9" },
+    { name: "17", me: false, score: "7" }
+  ];
+  var playersAfter = playersBefore.map(function (p) {
+    var s = parseInt(p.score, 10);
+    if (p.me) s += 7; else s += 2;
+    return { name: p.name, me: p.me, score: String(s) };
+  });
+  var guessEntry = {
+    ts: 1000, room: "#TEST1", round: "02 / 5", phase: "guess", progress: "5 / 5 已完成",
+    publicChar: "爱", central: "?", mySecret: "节", players: playersBefore,
+    clues: [
+      card("Alfred草药", "猜字中", ["钟", "亲"], ""),
+      card("kndr", "猜字中", ["实", "情"], ""),
+      card("小叮当", "猜字中", ["通", "提"], ""),
+      card("cos", "猜字中", ["气", "奏"], ""),
+      card("17", "猜字中", ["人", "走"], "")
+    ],
+    answers: ["表", "事", "交", "行", "情"]
+  };
+  var revealEntry = {
+    ts: 2000, room: "#TEST1", round: "02 / 5", phase: "reveal", progress: "5 / 5 已完成",
+    publicChar: "爱", central: "情", mySecret: "节", players: playersAfter,
+    clues: [
+      card("Alfred草药", "已揭晓", ["钟", "亲"], "表"),
+      card("kndr", "已揭晓", ["实", "情"], "事"),
+      card("小叮当", "已揭晓", ["通", "提"], "交"),
+      card("cos", "已揭晓", ["气", "奏"], "节"),
+      card("17", "已揭晓", ["人", "走"], "行")
+    ],
+    answers: ["表", "事", "交", "行", "情"]
+  };
+  localStorage.setItem("cj_qol_log_v1", JSON.stringify([guessEntry, revealEntry]));
+
+  var out = [];
+  out.push("extractHidden(Alfred)=" + window.__cjQol.extractHidden(revealEntry.clues[0]));
+  out.push("extractHidden(17)=" + window.__cjQol.extractHidden(revealEntry.clues[4]));
+
+  // 兜底路径：站点脚注文案被改掉时，靠“全卡共有字符”仍应解出隐藏字
+  var changed = revealEntry.clues.map(function (c) {
+    return { player: c.player, status: c.status, chars: c.chars,
+      text: c.text.replace(FOOT, "请猜这个字") };
+  });
+  var cc = window.__cjQol.commonChars(changed);
+  out.push("fallback(Alfred)=" + window.__cjQol.extractHidden(changed[0], cc));
+  out.push("fallback(kndr)=" + window.__cjQol.extractHidden(changed[1], cc));
+
+  var st = window.__cjQol.computeStats([guessEntry, revealEntry]);
+  out.push("stats=" + JSON.stringify(st));
+  out.push("csv-head=" + window.__cjQol.buildCsv([guessEntry, revealEntry]).split("\r\n")[0]);
+  out.push("csv-row2=" + window.__cjQol.buildCsv([guessEntry, revealEntry]).split("\r\n")[2].slice(0, 120));
+
+  window.__cjQol.togglePanel();
+  var panel = document.getElementById("cj-qol-panel");
+  out.push("panel=" + (panel ? panel.textContent.replace(/\s+/g, " ").slice(0, 260) : "MISSING"));
+  out.push("diagnose=" + window.__cjQol.diagnose().split("\n")[0].slice(0, 120));
+
+  var d = document.createElement("div");
+  d.id = "qol-test-dump";
+  d.style.cssText = "position:fixed;left:0;top:0;z-index:999999;background:#111;color:#7c7;font:12px monospace;padding:6px;max-width:70vw;white-space:pre-wrap;";
+  d.textContent = out.join("\n");
+  document.body.appendChild(d);
+})();
+</script>
+</body>
+</html>

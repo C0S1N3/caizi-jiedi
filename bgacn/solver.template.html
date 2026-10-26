@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猜字解底 · 组词求解器</title>
+<style>
+  :root {
+    --bg: #f6f4ee; --card: #fffdf8; --ink: #3a332b; --sub: #8a8071;
+    --accent: #2684ab; --accent-2: #b47a16; --line: #e8e2d5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    min-height: 100vh; padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header h1 { font-size: 22px; letter-spacing: 2px; }
+  header p { color: var(--sub); font-size: 13px; margin-top: 4px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; margin-top: 16px; box-shadow: 0 2px 8px rgba(60,50,30,.05);
+  }
+  .modes { display: flex; gap: 8px; margin-top: 16px; }
+  .modes button {
+    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); color: var(--sub); font-size: 14px; cursor: pointer;
+  }
+  .modes button.on { border-color: var(--accent); color: var(--accent); font-weight: bold; }
+  .clue-input { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .clue-input input {
+    width: 64px; height: 64px; text-align: center; font-size: 30px;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
+    font-family: inherit;
+  }
+  .clue-input input:focus { outline: 2px solid var(--accent); }
+  .clue-input button {
+    height: 36px; padding: 0 14px; border-radius: 8px; border: none;
+    background: var(--accent); color: #fff; font-size: 14px; cursor: pointer;
+  }
+  .clue-input button.ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); }
+  .hint { color: var(--sub); font-size: 12px; margin-top: 8px; }
+  #status { font-size: 13px; color: var(--sub); margin-top: 10px; }
+  .results { margin-top: 8px; }
+  .cand {
+    display: flex; align-items: baseline; gap: 12px; padding: 10px 8px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .cand .rank { color: var(--sub); font-size: 12px; width: 28px; flex: none; }
+  .cand .ch { font-size: 28px; width: 40px; flex: none; }
+  .cand .evi { font-size: 13px; color: var(--sub); line-height: 1.7; }
+  .cand .evi b { color: var(--ink); font-weight: normal; }
+  .cand .evi .tag { color: var(--accent-2); }
+  .empty { color: var(--sub); padding: 20px 0; text-align: center; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>猜字解底 · 组词求解器</h1>
+    <p>输入提示字，列出能与全部提示字组成双字词的候选字及证据。数据来自结巴分词词典（11.4 万双字词），本地运行。</p>
+  </header>
+
+  <div class="card">
+    <h2 style="font-size:15px;margin-bottom:8px;">怎么拿快照</h2>
+    <ol style="margin:0 0 10px;padding-left:20px;line-height:1.9;font-size:13px;color:var(--sub);">
+      <li>打开牌局页 <code>bgacn.com/r/xxxxxx</code>（要已进房间、牌发下来了，最好在「猜字」阶段）</li>
+      <li>按 <b>F12</b> → 切到「控制台 / Console」</li>
+      <li>在控制台里<strong>手打</strong>下面这行（是打字不是粘贴，Chrome 才不拦），回车 → 整页 HTML 进剪贴板</li>
+      <li><b>Esc</b> 关控制台 → 回到本页粘进下面的框 → 点「解析快照」</li>
+    </ol>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <code id="copy-cmd" style="flex:1;background:#f6f2ea;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;user-select:all;overflow:auto;white-space:nowrap;">copy(document.documentElement.outerHTML)</code>
+      <button id="copy-cmd-btn" class="ghost">复制指令</button>
+    </div>
+    <p class="hint" style="margin-top:8px;">备选：Elements 面板右键最上面的 <code>&lt;html&gt;</code> → 复制 → 复制 outerHTML（别选 innerHTML）。</p>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:15px;margin-bottom:8px;">快照解析</h2>
+    <textarea id="snap-in" placeholder="把牌局页 F12 复制的整页 HTML 粘到这里，或把文件拖进来；也可以直接粘油猴脚本「复制诊断」输出的 JSON"
+      style="width:100%;height:110px;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;font-family:inherit;resize:vertical;background:#fff;color:var(--ink);"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+      <button id="snap-btn" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:14px;cursor:pointer;">解析快照</button>
+      <input type="file" id="snap-file" accept=".html,.txt" style="font-size:12px;color:var(--sub);">
+      <span class="hint" style="margin:0;">Ctrl+Enter 也可解析</span>
+    </div>
+    <div id="snap-out" class="results"></div>
+  </div>
+
+  <div class="modes">
+    <button id="mode-guess" class="on">猜字（2 个提示字）</button>
+    <button id="mode-base">解底（多个隐藏字 + 公共字）</button>
+  </div>
+
+  <div class="card">
+    <div class="clue-input" id="clue-row">
+      <input maxlength="1" placeholder="提"><input maxlength="1" placeholder="示">
+      <button id="add" class="ghost" title="解底模式可加字">＋</button>
+      <button id="solve-btn">求解</button>
+    </div>
+    <p class="hint">回车也可求解；候选按「与所有提示字组词的最弱词频」排序，并列出组词证据。</p>
+    <div id="status"></div>
+    <div class="results" id="results"><div class="empty">输入提示字后求解</div></div>
+  </div>
+</div>
+
+<script id="word-data" type="text/plain">__WORDS__</script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = document.getElementById("word-data").textContent.trim();
+  var WORDS = [];
+  DATA.split("\n").forEach(function (line) {
+    var parts = line.split(" ");
+    if (parts.length !== 2) return;
+    var w = parts[0], f = parseInt(parts[1], 10);
+    if (w.length === 2 && w.charCodeAt(0) >= 0x4E00 && w.charCodeAt(0) <= 0x9FFF) {
+      WORDS.push([w, f]);
+    }
+  });
+
+  var INDEX = new Map(); // char -> Map(otherChar -> {maxF, words:[[w,f],...]})
+  WORDS.forEach(function (entry) {
+    var w = entry[0], f = entry[1], a = w[0], b = w[1];
+    var pairs = [[a, b], [b, a]];
+    for (var i = 0; i < 2; i++) {
+      var x = pairs[i][0], y = pairs[i][1];
+      if (!INDEX.has(x)) INDEX.set(x, new Map());
+      var m = INDEX.get(x);
+      if (!m.has(y)) m.set(y, { maxF: 0, words: [] });
+      var e = m.get(y);
+      e.words.push([w, f]);
+      if (f > e.maxF) e.maxF = f;
+    }
+  });
+
+  function solve(clues, limit) {
+    var seen = {}, uniq = [];
+    clues.forEach(function (c) {
+      if (INDEX.has(c) && !seen[c]) { seen[c] = 1; uniq.push(c); }
+    });
+    if (uniq.length === 0) return { missing: clues, out: [] };
+    var missing = clues.filter(function (c) { return !INDEX.has(c); });
+    var first = INDEX.get(uniq[0]);
+    var out = [];
+    first.forEach(function (e0, cand) {
+      var minF = e0.maxF, sumF = e0.maxF, ok = true;
+      var evidence = [[uniq[0], e0.words]];
+      for (var i = 1; i < uniq.length; i++) {
+        var m = INDEX.get(uniq[i]);
+        var e = m && m.get(cand);
+        if (!e) { ok = false; break; }
+        if (e.maxF < minF) minF = e.maxF;
+        sumF += e.maxF;
+        evidence.push([uniq[i], e.words]);
+      }
+      if (ok) out.push({ char: cand, minF: minF, sumF: sumF, evidence: evidence });
+    });
+    out.sort(function (p, q) { return (q.minF - p.minF) || (q.sumF - p.sumF); });
+    return { missing: missing, out: out.slice(0, limit || 50) };
+  }
+
+  // ---- 快照解析 ----
+
+  function parseSnapshot(html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    if (!doc.querySelector("main.cj-shell")) return null;
+    var st = {
+      room: (doc.querySelector(".cj-room-code") || {}).textContent || "",
+      phase: doc.querySelector("main.cj-shell").getAttribute("data-phase") || "",
+      round: (doc.querySelector(".cj-round strong") || {}).textContent || "",
+      progress: (doc.querySelector(".cj-progress") || {}).textContent || "",
+      publicChar: "", central: "", mySecret: "", clues: []
+    };
+    var pub = doc.querySelector(".cj-public strong");
+    if (pub) st.publicChar = pub.textContent.trim();
+    var cen = doc.querySelector(".cj-central strong");
+    if (cen) st.central = cen.textContent.trim();
+    var sec = doc.querySelector(".cj-secret strong");
+    if (sec) st.mySecret = sec.textContent.trim();
+    doc.querySelectorAll(".cj-clue-card").forEach(function (card) {
+      var name = card.querySelector("header strong");
+      var status = card.querySelector("header span");
+      var chars = [];
+      card.querySelectorAll(".cj-clue-face span").forEach(function (s) {
+        chars.push(s.textContent.trim());
+      });
+      st.clues.push({
+        player: name ? name.textContent.replace("（你）", "").trim() : "",
+        status: status ? status.textContent.trim() : "",
+        chars: chars
+      });
+    });
+    return st;
+  }
+
+  function eviLine(r) {
+    return r.evidence.map(function (ev) {
+      return ev[1].slice(0, 3).map(function (w) { return w[0]; }).join("、");
+    }).join(" / ");
+  }
+
+  function renderSnapshot(st) {
+    var out = document.getElementById("snap-out");
+    var html = '<div class="cand" style="border-bottom:1px solid var(--line);">' +
+      '<span class="evi">' + (st.room || "?") + " · ROUND " + (st.round || "?") +
+      " · 阶段 " + (st.phase || "?") + " · " + (st.progress || "") +
+      "<br>公共字 <b>" + (st.publicChar || "?") + "</b>" +
+      " · 我的隐藏字 <b>" + (st.mySecret || "?") + "</b>" +
+      " · 中央谜底 <b>" + (st.central || "?") + "</b></span></div>";
+
+    st.clues.forEach(function (c) {
+      var line = '<div class="cand"><span class="ch" style="font-size:16px;width:auto;min-width:70px;">' +
+        c.player + "</span><span class=\"evi\">提示 " + c.chars.join("/") + "（" + c.status + "）";
+      if (c.chars.length >= 2) {
+        var r = solve(c.chars, 6).out;
+        line += "<br>候选：" + (r.length
+          ? r.map(function (x, i) { return (i + 1) + ".<b>" + x.char + "</b>(" + eviLine(x) + ")"; }).join(" ")
+          : "无") + "</span></div>";
+      } else {
+        line += "</span></div>";
+      }
+      html += line;
+    });
+
+    var baseClues = [];
+    if (st.publicChar) baseClues.push(st.publicChar);
+    if (st.mySecret) baseClues.push(st.mySecret);
+    if (st.central && st.central !== "?") {
+      html += '<div class="cand"><span class="evi">中央谜底已揭晓：<b>' + st.central + "</b></span></div>";
+    } else if (baseClues.length >= 2) {
+      var br = solve(baseClues, 12).out;
+      html += '<div class="cand"><span class="ch" style="font-size:16px;width:auto;min-width:70px;">底</span>' +
+        '<span class="evi">由 公共字+我的隐藏字 约束：<br>' +
+        (br.length ? br.map(function (x, i) { return (i + 1) + ".<b>" + x.char + "</b>(" + eviLine(x) + ")"; }).join(" ") : "无") +
+        "</span></div>";
+    }
+    out.innerHTML = html;
+  }
+
+  // 油猴脚本「复制诊断」的输出：== state == 后跟一段 JSON
+  function parseDiag(text) {
+    var raw = text.trim();
+    var json = raw;
+    var s = raw.indexOf("== state ==");
+    if (s >= 0) {
+      json = raw.slice(s + "== state ==".length);
+      var e = json.indexOf("== clue card html ==");
+      if (e >= 0) json = json.slice(0, e);
+    }
+    json = json.trim();
+    if (json.charAt(0) !== "{") return null;
+    var j;
+    try { j = JSON.parse(json); } catch (e2) { return null; }
+    if (!j || !j.clues) return null;
+    return {
+      room: j.room || "", phase: j.phase || "", round: j.round || "", progress: j.progress || "",
+      publicChar: j.publicChar || "", central: j.central || "", mySecret: j.mySecret || "",
+      clues: (j.clues || []).map(function (c) {
+        var chars = Array.isArray(c.chars)
+          ? c.chars.slice()
+          : String(c.chars || "").split("/").filter(Boolean);
+        return {
+          player: String(c.player || "").replace("（你）", "").trim(),
+          status: c.status || "",
+          chars: chars
+        };
+      })
+    };
+  }
+
+  function runSnapshot() {
+    var text = document.getElementById("snap-in").value;
+    var out = document.getElementById("snap-out");
+    if (!text.trim()) { out.innerHTML = '<div class="empty">先粘贴或拖入快照</div>'; return; }
+    var st = parseDiag(text) || parseSnapshot(text);
+    if (!st) { out.innerHTML = '<div class="empty">没找到 main.cj-shell，这不是猜字解底牌局页的快照</div>'; return; }
+    renderSnapshot(st);
+  }
+
+  document.getElementById("snap-btn").addEventListener("click", runSnapshot);
+  document.getElementById("snap-in").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) runSnapshot();
+  });
+  document.getElementById("snap-file").addEventListener("change", function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      document.getElementById("snap-in").value = fr.result;
+      runSnapshot();
+    };
+    fr.readAsText(f);
+  });
+  var snapIn = document.getElementById("snap-in");
+  ["dragover", "drop"].forEach(function (t) {
+    snapIn.addEventListener(t, function (e) { e.preventDefault(); });
+  });
+  snapIn.addEventListener("drop", function (e) {
+    var f = e.dataTransfer.files[0];
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      snapIn.value = fr.result;
+      runSnapshot();
+    };
+    fr.readAsText(f);
+  });
+
+  // 复制控制台指令
+  function copyText(text, btn) {
+    var done = function (ok) {
+      var old = btn.textContent;
+      btn.textContent = ok ? "已复制" : "复制失败";
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    };
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    if (!ok && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      done(ok);
+    }
+  }
+  document.getElementById("copy-cmd-btn").addEventListener("click", function () {
+    copyText(document.getElementById("copy-cmd").textContent.trim(), this);
+  });
+
+  // ---- UI ----
+  var mode = "guess";
+  var modeGuess = document.getElementById("mode-guess");
+  var modeBase = document.getElementById("mode-base");
+  var row = document.getElementById("clue-row");
+  var addBtn = document.getElementById("add");
+  var solveBtn = document.getElementById("solve-btn");
+  var results = document.getElementById("results");
+  var status = document.getElementById("status");
+
+  function setMode(m) {
+    mode = m;
+    modeGuess.classList.toggle("on", m === "guess");
+    modeBase.classList.toggle("on", m === "base");
+    addBtn.style.display = m === "base" ? "" : "none";
+    if (m === "guess") {
+      var inputs = row.querySelectorAll("input");
+      while (inputs.length > 2) { row.removeChild(inputs[inputs.length - 1]); inputs = row.querySelectorAll("input"); }
+    }
+    render([]);
+    status.textContent = "";
+  }
+  modeGuess.addEventListener("click", function () { setMode("guess"); });
+  modeBase.addEventListener("click", function () { setMode("base"); });
+
+  addBtn.addEventListener("click", function () {
+    if (row.querySelectorAll("input").length >= 7) return;
+    var inp = document.createElement("input");
+    inp.maxLength = 1;
+    row.insertBefore(inp, addBtn);
+    inp.focus();
+  });
+
+  function getClues() {
+    var clues = [];
+    row.querySelectorAll("input").forEach(function (inp) {
+      var v = inp.value.trim();
+      if (v) clues.push(v[0]);
+    });
+    return clues;
+  }
+
+  function render(out) {
+    if (!out.length) {
+      results.innerHTML = '<div class="empty">输入提示字后求解</div>';
+      return;
+    }
+    var html = "";
+    out.forEach(function (r, i) {
+      html += '<div class="cand"><span class="rank">' + (i + 1) + '</span><span class="ch">' + r.char + "</span>";
+      html += '<span class="evi">';
+      r.evidence.forEach(function (ev) {
+        var clue = ev[0], words = ev[1];
+        var top = words.slice(0, 6).map(function (w) {
+          return "<b>" + w[0] + "</b>";
+        }).join("、");
+        var more = words.length > 6 ? '<span class="tag">等' + words.length + "词</span>" : "";
+        html += "<span>与「" + clue + "」：" + top + more + "</span><br>";
+      });
+      html += "</span></div>";
+    });
+    results.innerHTML = html;
+  }
+
+  function run() {
+    var clues = getClues();
+    if (clues.length < 2) {
+      status.textContent = "至少输入 2 个字。";
+      render([]);
+      return;
+    }
+    var t0 = performance.now();
+    var res = solve(clues, 200);
+    var ms = (performance.now() - t0).toFixed(1);
+    var missNote = res.missing.length ? "（词库中查无：" + res.missing.join("、") + "，已忽略）" : "";
+    status.textContent = "候选 " + res.out.length + " 个 · 用时 " + ms + " ms" + missNote;
+    render(res.out.slice(0, 50));
+  }
+
+  solveBtn.addEventListener("click", run);
+  row.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") run();
+    if (e.key === "Backspace" && e.target.value === "" && e.target.previousElementSibling && e.target.previousElementSibling.tagName === "INPUT") {
+      e.target.previousElementSibling.focus();
+    }
+  });
+  row.addEventListener("input", function (e) {
+    if (e.target.value.length >= e.target.maxLength) {
+      var next = e.target.nextElementSibling;
+      while (next && next.tagName !== "INPUT") next = next.nextElementSibling;
+      if (next) next.focus();
+    }
+  });
+})();
+</script>
+</body>
+</html>

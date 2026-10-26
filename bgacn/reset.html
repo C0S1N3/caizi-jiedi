@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><body>
+<script>
+try {
+  localStorage.removeItem("cj_qol_log_v1");
+  localStorage.removeItem("cj_qol_lastkey_v1");
+} catch (e) {}
+document.title = "CLEARED";
+document.body.textContent = "localStorage cleared: " + (localStorage.getItem("cj_qol_log_v1") === null ? "yes" : "no");
+</script>
+</body></html>
