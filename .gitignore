@@ -1,0 +1,6 @@
+dist/
+*.site
+.pages-status.log
+_dicts/
+_clover/
+__pycache__/

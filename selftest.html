@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>selftest</title>
+<style>
+  body { font: 13px monospace; margin: 0; }
+  #out { position: fixed; right: 0; top: 0; width: 45vw; max-height: 100vh; overflow: auto;
+    background: #111; color: #7c7; padding: 8px; white-space: pre-wrap; z-index: 9; }
+  #out .fail { color: #f77; }
+  iframe { width: 54vw; height: 100vh; border: 0; }
+</style>
+</head>
+<body>
+<iframe id="f" src="./index.html"></iframe>
+<pre id="out">running…</pre>
+<script>
+var f = document.getElementById("f");
+var lines = [], failures = 0;
+function log(s) { lines.push(s); document.getElementById("out").textContent = lines.join("\n"); }
+function pass(name, ok, extra) {
+  if (!ok) failures++;
+  log((ok ? "PASS " : "FAIL ") + name + (extra ? " | " + extra : ""));
+}
+function flat(el) { return el ? el.textContent.replace(/\s+/g, " ").trim() : "MISSING"; }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function setv(el, v) { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); }
+
+f.onload = async function () {
+  var d = f.contentDocument;
+  if (!d) { log("NO DOC"); return; }
+  f.contentWindow.addEventListener("error", function (e) {
+    failures++; log("FAIL runtime error | " + e.message);
+  });
+
+  var cards = d.querySelectorAll(".card");
+  pass("order: 出提示 first", cards.length >= 2 && /出提示/.test(cards[0].querySelector("h2").textContent) && /猜字 \+ 解底/.test(cards[1].querySelector("h2").textContent));
+  var tabPractice = d.getElementById("mode-practice").getBoundingClientRect();
+  var tabSolver = d.getElementById("mode-solver").getBoundingClientRect();
+  pass("practice tab is left of solver", tabPractice.left < tabSolver.left, "practice=" + Math.round(tabPractice.left) + " solver=" + Math.round(tabSolver.left));
+  pass("no old add button", d.getElementById("guess-add") === null);
+
+  var rows = d.querySelectorAll("#guess-rows .pair-row");
+  var inputs = Array.prototype.map.call(rows, function (r) { return r.querySelectorAll("input"); });
+  pass("5 default opponent rows", rows.length === 5, "rows=" + rows.length);
+  pass("one input per opponent", inputs.every(function (x) { return x.length === 1; }), "counts=" + inputs.map(function (x) { return x.length; }).join(","));
+  pass("pair input is not length-limited", inputs.every(function (x) { return x[0].maxLength < 0 || x[0].maxLength > 2; }), "maxlength=" + inputs[0][0].maxLength);
+
+  setv(d.getElementById("my-char"), " 节 ");
+  pass("my char syncs to merged panel", d.getElementById("base-mine").value === "节");
+
+  d.getElementById("clue-solve").click();
+  await sleep(900);
+  pass("出提示 strips spaces", d.getElementById("my-char").value === "节", "value=" + d.getElementById("my-char").value);
+  var clue = flat(d.getElementById("clue-out"));
+  pass("出提示 works", clue.indexOf("环") >= 0 && clue.indexOf("奏") >= 0 && clue.indexOf("推荐") >= 0, clue.slice(0, 100));
+
+  setv(d.getElementById("public-char"), " 爱 ");
+  setv(d.getElementById("base-mine"), " 节 ");
+  [" 钟 亲 ", "实 情", " 通提", "人走 "].forEach(function (p, i) {
+    setv(inputs[i][0], p);
+  });
+  d.getElementById("guess-solve").click();
+  await sleep(500);
+  var merged = flat(d.getElementById("guess-out"));
+  pass("spaces in single-char fields ignored", d.getElementById("public-char").value === "爱" && d.getElementById("base-mine").value === "节", "public=" + d.getElementById("public-char").value + " mine=" + d.getElementById("base-mine").value);
+  pass("spaces in pair input ignored", inputs[0][0].value === "钟亲", "value=" + inputs[0][0].value);
+  pass("merged: base locked to 情", merged.indexOf("唯一可解底") >= 0 && merged.indexOf("爱情（公）") >= 0, merged.slice(0, 140));
+  pass("merged: filters by solve-ability", merged.indexOf("个能解底") >= 0 && merged.indexOf("推荐作答") >= 0);
+  pass("merged: unique hint group", merged.indexOf("钟 亲") >= 0 && merged.indexOf("唯一") >= 0 && merged.indexOf("1 个候选能解底") >= 0);
+  pass("merged: ignores blank rows", merged.indexOf("对手 5 ") < 0);
+  pass("solver status cleared", d.getElementById("guess-status").textContent === "", "status=" + d.getElementById("guess-status").textContent);
+
+  setv(inputs[4][0], "钟");
+  d.getElementById("guess-solve").click();
+  await sleep(300);
+  pass("incomplete row is noted", flat(d.getElementById("guess-out")).indexOf("对手 5 的提示字还差一个字") >= 0);
+
+  setv(inputs[4][0], "钟 亲 情");
+  d.getElementById("guess-solve").click();
+  await sleep(300);
+  pass("extra characters are trimmed with a note", flat(d.getElementById("guess-out")).indexOf("多填了字，只取前两个字「钟亲」") >= 0 && inputs[4][0].value === "钟亲", "value=" + inputs[4][0].value);
+
+  setv(inputs[4][0], "");
+  ["钟亲", "实情", "通提", "人走"].forEach(function (p, i) { setv(inputs[i][0], ""); });
+  d.getElementById("guess-solve").click();
+  await sleep(300);
+  var baseOnly = flat(d.getElementById("guess-out"));
+  pass("base-only mode still works", baseOnly.indexOf("底候选 3 个") >= 0 && baseOnly.indexOf("情") >= 0, baseOnly.slice(0, 120));
+
+  ["钟亲", "实情", "通提", "人走"].forEach(function (p, i) { setv(inputs[i][0], p); });
+  d.getElementById("show-weak").checked = true;
+  d.getElementById("guess-solve").click();
+  await sleep(400);
+  var weak = flat(d.getElementById("guess-out"));
+  pass("weak mode shows rare words and bases", /底候选 [2-9][0-9]* 个/.test(weak) && weak.indexOf("含生僻词") >= 0 && weak.indexOf("生僻组合") >= 0, weak.slice(0, 140));
+
+  d.getElementById("show-weak").checked = false;
+  d.getElementById("guess-solve").click();
+  await sleep(300);
+  var strict = flat(d.getElementById("guess-out"));
+  pass("strict mode folds rare base", strict.indexOf("底候选 1 个") >= 0 && /另有 [1-9][0-9]* 个生僻解/.test(strict) && strict.indexOf("个底需要生僻组词") >= 0, strict.slice(0, 140));
+
+  setv(inputs[4][0], "福陈");
+  d.getElementById("guess-solve").click();
+  await sleep(400);
+  var fallback = flat(d.getElementById("guess-out"));
+  var firstBase = d.querySelector("#guess-out .base-card[open] .base-ch");
+  pass("fallback: suspected base allows a miss", fallback.indexOf("疑似底") >= 0 && fallback.indexOf("4/5 组对上") >= 0 && fallback.indexOf("对不上：对手 5「福陈」") >= 0 && fallback.indexOf("未对上") >= 0, fallback.slice(0, 200));
+  pass("fallback: strongest 4/5 base ranks first", firstBase && firstBase.textContent === "情", "first=" + (firstBase && firstBase.textContent));
+
+  // 单机练习
+  d.getElementById("mode-practice").click();
+  await sleep(1400);
+  var P = f.contentWindow.__cjPractice;
+  pass("practice: mode switch", d.getElementById("solver-view").hidden && !d.getElementById("practice-view").hidden);
+  pass("practice: round generated", !!P.current && d.querySelectorAll("#practice-out .clue-card").length === P.players - 1 && d.querySelectorAll("#practice-out .answer-card").length === P.players);
+  var slot0 = d.querySelector("#practice-out .practice-board .slot b");
+  pass("practice: base hidden before submit", slot0 && slot0.textContent === "?");
+  var cur = P.current;
+  var answers = [cur.X].concat(cur.opps.map(function (o) { return o.char; }));
+  var ansInputs = d.querySelectorAll("#practice-out .answer-card input");
+  answers.forEach(function (a, i) { setv(ansInputs[i], a); });
+  d.querySelector("#practice-out .practice-actions button.primary").click();
+  await sleep(300);
+  pass("practice: scoring", cur.submitted && cur.roundScore === P.players + 2 && P.total === cur.roundScore, "score=" + cur.roundScore + " total=" + P.total);
+  pass("practice: reveal shows true chars", flat(d.getElementById("practice-out")).indexOf("真身") >= 0 && flat(d.getElementById("practice-out")).indexOf("谜底 +3") >= 0);
+  var nextBtn = Array.from(d.querySelectorAll("#practice-out button")).find(function (b) { return b.textContent === "下一轮"; });
+  pass("practice: next round button", !!nextBtn);
+  if (nextBtn) {
+    nextBtn.click();
+    await sleep(1400);
+    pass("practice: round advances", P.round === 1 && !!P.current && !P.current.submitted);
+  }
+
+  f.style.width = "375px";
+  await sleep(300);
+  var sw = d.documentElement.scrollWidth, cw = d.documentElement.clientWidth;
+  pass("mobile 375 no horizontal overflow", sw <= cw + 1, "scrollW=" + sw + " clientW=" + cw);
+
+  log(failures ? ("DONE: " + failures + " failure(s)") : "DONE: all passed");
+};
+</script>
+</body>
+</html>

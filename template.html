@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>猜字解底 · 求解器</title>
+<meta name="description" content="猜字解底通用求解器：先给自己的隐藏字找提示组合；再输入公共字、我的字和别人的提示，只保留能解出底的候选。纯本地运行，可离线使用。">
+<style>
+  :root {
+    --ink: #2f2a23;
+    --sub: #8a8071;
+    --line: #e4dccb;
+    --paper: #faf7f0;
+    --card: #fffdf8;
+    --accent: #8c6b2f;
+    --good: #1c6b45;
+    --warn: #a2501f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; }
+  header h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: 2px; }
+  header p { margin: 0 0 20px; color: var(--sub); font-size: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 10px rgba(80, 65, 40, .05);
+  }
+  h2 { font-size: 17px; margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  h2 .tag { font-size: 12px; font-weight: normal; color: var(--sub); }
+  details.rules summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+  details.rules ul { margin: 10px 0 0; padding-left: 20px; color: var(--sub); font-size: 14px; }
+  details.rules li { margin: 4px 0; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type="text"], input:not([type]) {
+    width: 56px; height: 48px; text-align: center;
+    font-size: 22px; color: var(--ink);
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    outline: none; font-family: inherit;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(140, 107, 47, .12); }
+  input.pair-input {
+    width: 118px; padding: 0 10px; text-align: left;
+    font-size: 20px; letter-spacing: 7px;
+  }
+  input.pair-input::placeholder { font-size: 13px; letter-spacing: 0; color: var(--sub); }
+  .base-fields { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .base-fields label { display: flex; gap: 8px; align-items: center; color: var(--sub); font-size: 13px; }
+  button {
+    font-family: inherit; font-size: 14px; cursor: pointer;
+    border-radius: 10px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); padding: 9px 16px; min-height: 44px;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.ghost { color: var(--sub); }
+  button.mini { min-height: 34px; padding: 4px 10px; font-size: 13px; }
+  button:active { transform: translateY(1px); }
+  .pair-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .pair-row .idx { color: var(--sub); font-size: 13px; min-width: 42px; }
+  .opts { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 10px 0 0; color: var(--sub); font-size: 13px; }
+  .opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .results { margin-top: 14px; }
+  .empty { color: var(--sub); text-align: center; padding: 18px 0; font-size: 14px; }
+  .status { color: var(--sub); font-size: 13px; margin-bottom: 8px; }
+  .status-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 8px; }
+  .status-line .note { font-size: 13px; color: var(--sub); }
+  .badge {
+    font-size: 12px; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--sub); background: #fff; font-weight: normal;
+  }
+  .badge.ok { color: var(--good); border-color: #9fcbb2; background: #eef8f1; }
+  .badge.warn { color: var(--warn); border-color: #e6c3aa; background: #fdf2ea; }
+
+  .cand-list { display: flex; flex-direction: column; gap: 8px; }
+  .cand {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff;
+  }
+  .cand.top { border-color: #cdb98d; background: #fffdf4; }
+  .cand .ch {
+    font-size: 30px; line-height: 1.1; min-width: 46px; text-align: center;
+    color: var(--accent); font-weight: 600;
+  }
+  .cand .ch.top { color: var(--good); }
+  .cand .meta { flex: 1; min-width: 0; }
+  .cand .evi { color: var(--sub); font-size: 13px; word-break: break-all; }
+  .cand .evi b { color: var(--ink); font-weight: 600; }
+  .cand .note { font-size: 12px; color: var(--warn); margin-top: 2px; }
+
+  .clue-card {
+    padding: 12px; border: 1px solid var(--line); border-radius: 12px;
+    background: #fff; margin-bottom: 10px;
+  }
+  .clue-card.unique { border-color: #9fcbb2; background: #f7fdf9; }
+  .clue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .clue-pair { font-size: 24px; letter-spacing: 6px; font-weight: 600; }
+  .clue-evi { margin-top: 6px; color: var(--sub); font-size: 14px; }
+  .clue-evi b { color: var(--ink); }
+  .rivals { margin-top: 6px; font-size: 13px; color: var(--sub); }
+  .rivals .r { color: var(--warn); }
+
+  .base-card {
+    border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-top: 10px;
+  }
+  .base-card.rec { border-color: #cdb98d; background: #fffdf4; }
+  .base-card > summary {
+    list-style: none; cursor: pointer; padding: 12px;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  .base-card > summary::-webkit-details-marker { display: none; }
+  .base-card > summary::after { content: "▾"; color: var(--sub); margin-left: auto; font-size: 12px; }
+  .base-card[open] > summary::after { content: "▴"; }
+  .base-ch { font-size: 32px; line-height: 1.1; font-weight: 600; color: var(--accent); min-width: 38px; text-align: center; }
+  .base-card.rec .base-ch { color: var(--good); }
+  .base-evi { color: var(--sub); font-size: 13px; }
+  .base-evi b { color: var(--ink); font-weight: 600; }
+  .base-evi small { color: var(--sub); font-size: 11px; }
+  .base-score { color: var(--sub); font-size: 12px; }
+  .base-body { padding: 0 12px 12px; border-top: 1px dashed var(--line); }
+
+  .answer-line {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    padding: 10px 0 2px;
+  }
+  .answer-label { color: var(--sub); font-size: 12px; margin-right: 2px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 5px;
+    font-size: 13px; padding: 3px 9px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: var(--sub);
+  }
+  .chip b { color: var(--ink); font-size: 17px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  .group-block { margin-top: 12px; }
+  .group-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .group-name { color: var(--sub); font-size: 13px; }
+  .group-pair { font-size: 18px; font-weight: 600; letter-spacing: 5px; }
+  .group-count { color: var(--sub); font-size: 12px; }
+  .cand-more { margin-top: 7px; }
+  .cand-more summary { cursor: pointer; color: var(--sub); font-size: 13px; }
+  .cand-more .cand-list { margin-top: 8px; }
+
+  .base-list { display: flex; flex-direction: column; gap: 6px; }
+  .base-item {
+    display: flex; gap: 12px; align-items: baseline;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  }
+  .base-item.top { border-color: #cdb98d; background: #fffdf4; }
+  .base-rank { color: var(--sub); font-size: 12px; width: 28px; flex: none; }
+  .base-item .base-ch { font-size: 26px; min-width: 34px; }
+  .base-meta { flex: 1; min-width: 0; font-size: 13px; color: var(--sub); }
+  .base-meta b { color: var(--ink); font-weight: 600; }
+  .base-meta .sub { font-size: 12px; }
+  footer { color: var(--sub); font-size: 12px; text-align: center; margin-top: 24px; line-height: 1.9; }
+  .modes { display: flex; gap: 8px; margin-bottom: 16px; }
+  .modes button {
+    flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--sub); font-size: 14px; min-height: 44px;
+  }
+  .modes button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; background: #fffdf4; }
+  .field { display: flex; gap: 8px; align-items: center; color: var(--sub); font-size: 13px; }
+  .field select {
+    font-family: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: var(--ink); min-height: 40px;
+  }
+  .practice-score { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; margin-bottom: 10px; color: var(--sub); font-size: 13px; }
+  .practice-score b { color: var(--accent); font-size: 16px; }
+  .practice-board { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .practice-board .slot {
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .practice-board .slot small { color: var(--sub); font-size: 12px; }
+  .practice-board .slot b { font-size: 24px; color: var(--accent); font-weight: 600; }
+  .practice-board .slot.mine b { color: var(--good); }
+  .clue-card .clue-answer { margin-top: 6px; font-size: 13px; color: var(--sub); }
+  .clue-card .clue-answer b { color: var(--ink); }
+  .answer-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .answer-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .answer-card span { font-size: 12px; color: var(--sub); }
+  .answer-card .judge { font-size: 12px; color: var(--sub); min-height: 16px; }
+  .answer-card.hit input { border-color: #9fcbb2; background: #eef8f1; }
+  .answer-card.miss input { border-color: #e6c3aa; background: #fdf2ea; }
+  .answer-card.own input { border-color: #cdb98d; background: #fffdf4; }
+  .judge.hit { color: var(--good); }
+  .judge.miss { color: var(--warn); }
+  .practice-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  @media (max-width: 520px) {
+    .wrap { padding: 18px 12px 48px; }
+    header h1 { font-size: 22px; }
+    .cand .ch { font-size: 26px; min-width: 38px; }
+    .clue-pair { font-size: 21px; }
+    input.pair-input { width: 102px; }
+    .base-ch { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>猜字解底 · 求解器</h1>
+    <p>求解器：出提示、猜字解底，只留下<b>能解出底</b>的候选；单机练习：没朋友时自己玩一局。词库 13.3 万双字词，全部在本机计算，可离线使用。</p>
+  </header>
+
+  <div class="modes" id="mode-switch" role="tablist">
+    <button id="mode-practice" role="tab">单机练习</button>
+    <button id="mode-solver" class="on" role="tab">求解器</button>
+  </div>
+
+  <div id="solver-view">
+  <section class="card">
+    <h2>① 出提示 <span class="tag">我的隐藏字 → 少有多解的提示组合</span></h2>
+    <div class="row">
+      <input id="my-char" inputmode="text" placeholder="字" aria-label="我的隐藏字">
+      <button id="clue-solve" class="primary">找提示</button>
+      <span class="status" id="clue-status"></span>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="only-unique" checked> 排除有真实对手的组合</label>
+      <label><input type="checkbox" id="common-only" checked> 提示字只用常用字</label>
+      <label>排序
+        <select id="sort-mode" style="font-family:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);">
+          <option value="common">更常见优先</option>
+          <option value="unique">更唯一优先</option>
+        </select>
+      </label>
+    </div>
+    <div id="clue-out" class="results"><div class="empty">输入你的隐藏字后点找提示</div></div>
+  </section>
+
+  <section class="card">
+    <h2>② 猜字 + 解底 <span class="tag">公共字 + 我的字 + 别人的提示 → 能解出底的隐藏字和底</span></h2>
+    <div class="base-fields">
+      <label>公共字 <input id="public-char" inputmode="text" placeholder="公" aria-label="公共字"></label>
+      <label>我的隐藏字 <input id="base-mine" inputmode="text" placeholder="我" aria-label="我的隐藏字（猜字解底）"></label>
+    </div>
+    <div id="guess-rows"></div>
+    <div class="row">
+      <button id="guess-solve" class="primary">猜字 + 解底</button>
+      <span class="status" id="guess-status"></span>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="show-weak"> 显示生僻候选 / 生僻解</label>
+      <span style="color:var(--sub);font-size:12px;">提示字可带空格，自动忽略</span>
+    </div>
+    <div id="guess-out" class="results"><div class="empty">填公共字、我的字，再按顺序填对手的提示字；人数少就留空</div></div>
+  </section>
+  </div>
+
+  <div id="practice-view" hidden>
+    <section class="card">
+      <h2>单机练习 <span class="tag">没朋友时自己练一局：猜隐藏字 + 解底，共 5 轮</span></h2>
+      <div class="row">
+        <button id="practice-start" class="primary">开始新的一局</button>
+        <label class="field">人数
+          <select id="practice-players">
+            <option value="3">3 人</option>
+            <option value="4">4 人</option>
+            <option value="5" selected>5 人</option>
+            <option value="6">6 人</option>
+          </select>
+        </label>
+        <span class="status" id="practice-status"></span>
+      </div>
+      <div id="practice-out" class="results"><div class="empty">点「开始新的一局」：会像真人局一样摆好公共字、我的字和对手提示；你负责猜出对手的隐藏字和中央谜底。</div></div>
+    </section>
+  </div>
+
+  <details class="card rules">
+    <summary>玩法速查（点开）</summary>
+    <ul>
+      <li>每人有一个隐藏字，写两个提示字；提示字要能与自己的隐藏字各组成一个词（如隐藏字「节」，可写「奏」「环」→ 节奏、环节）。</li>
+      <li>猜中别人的隐藏字：猜的人 +1，被猜中的人 +1。</li>
+      <li>每轮另有一个公共字和一个中央谜底。公共字只负责和中央谜底组词；中央谜底要能和公共字、以及每个人的隐藏字都组词。猜中中央谜底 +3。</li>
+      <li>猜字时，一个提示组往往能推出很多字。本工具会把它们逐个代进「底」，凡是和公共字、我的字拼不出同一个底的候选，直接不显示。</li>
+      <li>所有提示组共用同一个底；所以一组提示填错，整桌结果会一起偏。</li>
+      <li>如果常见词里没有能同时满足所有提示组的底，工具会给几个<b>疑似底</b>：允许最多 2 组对不上，并标出是哪一组；先核对那一组是不是生僻词或填错了。</li>
+      <li>切到「单机练习」可以自己玩：自动摆好公共字、我的字和对手提示，你猜对手的隐藏字和中央谜底，按猜字 +1 / 解底 +3 计分，共 5 轮。</li>
+    </ul>
+  </details>
+
+  <footer>
+    词库：133,343 条双字词（jieba、CC-CEDICT、SUBTLEX-CH、THUOCL，词频参考 SUBTLEX-CH 标定）<br>
+    猜字解底：候选必须同时与两个提示字组词，并与一个共同的底组词；底还必须同时与公共字、我的字组词。默认只用词频 ≥30 的常见词，找不到时才放宽到 ≥5。<br>
+    出提示：先排除有真实对手的组合，再按证据词常用度排序
+  </footer>
+</div>
+
+<script id="word-data" type="text/plain">__WORDS__</script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 词库 ----------
+
+  var STRONG_F = 30;        // 达到这个词频才算“真实对手”/“常见组合”
+  var WEAK_F = 5;           // 放宽时也只取词频 ≥5 的词，低于 5 多是词典噪声
+  var HINT_COMMON = 2500;   // 常用提示字的字符排名上限
+  var CLUE_WORD_F = 50;     // 出提示时，(提示字,我的字) 至少这么常用
+  var MAX_NEIGHBORS = 80;   // 出提示时最多考察多少个邻字，控制计算量
+  var SOL_SHOW = 5;         // 每位对手默认展开多少个能解底的候选
+  var MAX_BASE_CARDS = 6;   // 最多展开多少个底
+  var MAX_SUSPECTS = 5;     // 解不出时最多给几个疑似底
+
+  var INDEX = new Map();    // char -> Map(char -> { maxF, words: [[词, 频]] })
+  var CHR_TOTAL = new Map();// char -> 所有词频之和，用来判断常用字
+  var RANK = new Map();
+  var COUNT = 0;
+
+  (function loadWords() {
+    var raw = document.getElementById("word-data").textContent.trim();
+    var lines = raw.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var sp = lines[i].lastIndexOf(" ");
+      if (sp < 1) continue;
+      var w = lines[i].slice(0, sp);
+      if (w.length !== 2) continue;
+      var c0 = w.charCodeAt(0), c1 = w.charCodeAt(1);
+      if (c0 < 0x4E00 || c0 > 0x9FFF || c1 < 0x4E00 || c1 > 0x9FFF) continue;
+      var f = parseInt(lines[i].slice(sp + 1), 10);
+      if (!f) continue;
+      COUNT++;
+      link(w[0], w[1], w, f);
+      link(w[1], w[0], w, f);
+      CHR_TOTAL.set(w[0], (CHR_TOTAL.get(w[0]) || 0) + f);
+      CHR_TOTAL.set(w[1], (CHR_TOTAL.get(w[1]) || 0) + f);
+    }
+    Array.from(CHR_TOTAL.keys())
+      .sort(function (a, b) { return CHR_TOTAL.get(b) - CHR_TOTAL.get(a); })
+      .forEach(function (c, i) { RANK.set(c, i); });
+  })();
+
+  function link(x, y, w, f) {
+    var m = INDEX.get(x);
+    if (!m) { m = new Map(); INDEX.set(x, m); }
+    var e = m.get(y);
+    if (!e) { e = { maxF: 0, words: [] }; m.set(y, e); }
+    if (f > e.maxF) e.maxF = f;
+    e.words.push([w, f]);
+    if (e.words.length > 4) {
+      e.words.sort(function (a, b) { return b[1] - a[1]; });
+      e.words.length = 3;
+    }
+  }
+
+  // ---------- 通用 ----------
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function b(text) { return el("b", null, text); }
+
+  function rich(parts) {
+    var frag = document.createDocumentFragment();
+    parts.forEach(function (p) {
+      if (p && p.nodeType) frag.appendChild(p);
+      else frag.appendChild(document.createTextNode(String(p)));
+    });
+    return frag;
+  }
+
+  function hanOnly(s) {
+    var out = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c >= 0x4E00 && c <= 0x9FFF) out += s.charAt(i);
+    }
+    return out;
+  }
+
+  function readChar(inp) {
+    var v = hanOnly(inp.value);
+    if (v.length > 1) v = v.slice(0, 1);
+    if (inp.value !== v) inp.value = v;
+    return v;
+  }
+
+  function evidenceText(item) {
+    return item.ev.map(function (e) {
+      var ws = e.words.slice().sort(function (a, b) { return b[1] - a[1]; });
+      return ws.length ? ws[0][0] : "";
+    }).join("、");
+  }
+
+  function candidateList(chars) {
+    var uniq = [];
+    chars.forEach(function (c) {
+      if (c && INDEX.has(c) && uniq.indexOf(c) < 0) uniq.push(c);
+    });
+    if (uniq.length < 2) return [];
+    var out = [];
+    INDEX.get(uniq[0]).forEach(function (e0, cand) {
+      if (uniq.indexOf(cand) >= 0) return;
+      var minF = e0.maxF, sumF = e0.maxF, ev = [e0];
+      for (var i = 1; i < uniq.length; i++) {
+        var e = INDEX.get(uniq[i]).get(cand);
+        if (!e) return;
+        if (e.maxF < minF) minF = e.maxF;
+        sumF += e.maxF;
+        ev.push(e);
+      }
+      out.push({ char: cand, minF: minF, sumF: sumF, ev: ev });
+    });
+    out.sort(function (p, q) { return (q.minF - p.minF) || (q.sumF - p.sumF); });
+    return out;
+  }
+
+  function baseCandidates(chars) {
+    var uniq = [];
+    chars.forEach(function (c) {
+      if (c && INDEX.has(c) && uniq.indexOf(c) < 0) uniq.push(c);
+    });
+    if (!uniq.length) return null;
+    if (uniq.length === 1) {
+      var out = [];
+      INDEX.get(uniq[0]).forEach(function (e, other) {
+        out.push({ char: other, minF: e.maxF, sumF: e.maxF, ev: [e] });
+      });
+      out.sort(function (p, q) { return (q.minF - p.minF) || (q.sumF - p.sumF); });
+      return out;
+    }
+    return candidateList(uniq);
+  }
+
+  function neighborsOf(x) {
+    var m = INDEX.get(x);
+    if (!m) return [];
+    var list = [];
+    m.forEach(function (e, other) { list.push({ ch: other, f: e.maxF }); });
+    list.sort(function (a, b) { return b.f - a.f; });
+    return list;
+  }
+
+  function bestWord(a, c) {
+    var m = INDEX.get(a);
+    var e = m && m.get(c);
+    if (!e || !e.words.length) return "";
+    var ws = e.words.slice().sort(function (p, q) { return q[1] - p[1]; });
+    return ws[0][0];
+  }
+
+  function rankOf(c) {
+    var r = RANK.get(c);
+    return r == null ? 999999 : r;
+  }
+
+  // ---------- ① 出提示 ----------
+
+  function findClues(x, onlyUnique, commonOnly, sortMode) {
+    var neigh = neighborsOf(x).filter(function (n) {
+      if (n.f < CLUE_WORD_F) return false;
+      if (commonOnly && (RANK.get(n.ch) == null || RANK.get(n.ch) > HINT_COMMON)) return false;
+      return true;
+    }).slice(0, MAX_NEIGHBORS);
+
+    var res = [];
+    for (var i = 0; i < neigh.length; i++) {
+      for (var j = i + 1; j < neigh.length; j++) {
+        var a = neigh[i], b = neigh[j];
+        var cands = candidateList([a.ch, b.ch]);
+        var mine = null, rivals = [];
+        cands.forEach(function (c) {
+          if (c.char === x) mine = c;
+          else rivals.push(c);
+        });
+        if (!mine) continue;
+        var real = rivals.filter(function (r) { return r.minF >= STRONG_F; });
+        var weak = rivals.filter(function (r) { return r.minF < STRONG_F; });
+        if (onlyUnique && real.length) continue;
+        res.push({
+          a: a.ch, b: b.ch,
+          wordA: bestWord(a.ch, x),
+          wordB: bestWord(b.ch, x),
+          score: Math.min(a.f, b.f),
+          real: real,
+          weak: weak
+        });
+      }
+    }
+    res.sort(function (p, q) {
+      if (p.real.length !== q.real.length) return p.real.length - q.real.length;
+      if (sortMode === "unique" && p.weak.length !== q.weak.length) return p.weak.length - q.weak.length;
+      if (q.score !== p.score) return q.score - p.score;
+      if (p.weak.length !== q.weak.length) return p.weak.length - q.weak.length;
+      return (rankOf(p.a) + rankOf(p.b)) - (rankOf(q.a) + rankOf(q.b));
+    });
+    return { list: res, scanned: neigh.length };
+  }
+
+  function renderClues(host, x, result) {
+    if (!result.list.length) {
+      host.appendChild(el("div", "empty", "没找到合适的提示组合，试着取消勾选「排除有真实对手的组合」"));
+      return;
+    }
+    host.appendChild(el("div", "status",
+      "考察 " + result.scanned + " 个能和「" + x + "」组词的常用字，命中 " + result.list.length + " 组" +
+      (document.getElementById("only-unique").checked ? "（已排除有真实对手的）" : "")));
+    result.list.slice(0, 12).forEach(function (r, i) {
+      var unique = !r.real.length && !r.weak.length;
+      var card = el("div", "clue-card" + (r.real.length ? "" : " unique"));
+      var head = el("div", "clue-head");
+      head.appendChild(el("span", "clue-pair", r.a + " " + r.b));
+      head.appendChild(el("span", "badge" + (unique || !r.real.length ? " ok" : " warn"),
+        unique ? "唯一解" : (r.real.length ? "有 " + r.real.length + " 个真实对手" : "无常见对手")));
+      head.appendChild(el("span", "badge", "第 " + (i + 1) + " 推荐"));
+      card.appendChild(head);
+      var evi = el("div", "clue-evi");
+      evi.appendChild(rich([
+        b(r.wordA), " · ", b(r.wordB),
+        unique ? " → 同时成立的只有「" : " → 「",
+        b(x),
+        unique ? "」" : "」成立，但不是唯一解"
+      ]));
+      card.appendChild(evi);
+      if (r.real.length) {
+        var rivals = el("div", "rivals");
+        var frag = document.createDocumentFragment();
+        frag.appendChild(document.createTextNode("另有真实候选："));
+        r.real.slice(0, 4).forEach(function (c, k) {
+          if (k) frag.appendChild(document.createTextNode("、"));
+          frag.appendChild(el("span", "r", c.char));
+          frag.appendChild(document.createTextNode("（" + evidenceText(c) + "）"));
+        });
+        rivals.appendChild(frag);
+        card.appendChild(rivals);
+      } else if (r.weak.length) {
+        var weakBox = el("div", "rivals");
+        var frag2 = document.createDocumentFragment();
+        frag2.appendChild(document.createTextNode("另有生僻候选："));
+        r.weak.slice(0, 4).forEach(function (c, k) {
+          if (k) frag2.appendChild(document.createTextNode("、"));
+          frag2.appendChild(document.createTextNode(c.char + "（" + evidenceText(c) + "）"));
+        });
+        weakBox.appendChild(frag2);
+        card.appendChild(weakBox);
+      }
+      host.appendChild(card);
+    });
+  }
+
+  document.getElementById("clue-solve").addEventListener("click", function () {
+    var out = document.getElementById("clue-out");
+    var status = document.getElementById("clue-status");
+    out.innerHTML = "";
+    var x = readChar(document.getElementById("my-char"));
+    if (!x) { out.appendChild(el("div", "empty", "先输入你的隐藏字")); return; }
+    if (!INDEX.has(x)) { out.appendChild(el("div", "empty", "词库里没有以「" + x + "」组成的双字词")); return; }
+    status.textContent = "计算中…";
+    setTimeout(function () {
+      var t0 = performance.now();
+      var result = findClues(x,
+        document.getElementById("only-unique").checked,
+        document.getElementById("common-only").checked,
+        document.getElementById("sort-mode").value);
+      status.textContent = Math.round(performance.now() - t0) + " ms";
+      renderClues(out, x, result);
+    }, 20);
+  });
+
+  // ---------- ② 猜字 + 解底 ----------
+
+  var guessRows = document.getElementById("guess-rows");
+  var publicInput = document.getElementById("public-char");
+  var baseMineInput = document.getElementById("base-mine");
+
+  function addGuessRow() {
+    var row = el("div", "pair-row");
+    row.appendChild(el("span", "idx", "对手 " + (guessRows.children.length + 1)));
+    var inp = document.createElement("input");
+    inp.className = "pair-input";
+    inp.placeholder = "两个提示字";
+    inp.setAttribute("aria-label", "对手的两个提示字");
+    row.appendChild(inp);
+    guessRows.appendChild(row);
+  }
+
+  function collectGroups() {
+    var groups = [], notes = [];
+    Array.prototype.forEach.call(guessRows.children, function (row, i) {
+      var inp = row.querySelector("input");
+      var allHan = hanOnly(inp.value);
+      var pair = allHan.slice(0, 2);
+      if (inp.value !== pair) inp.value = pair;
+      if (!pair) return;
+      var idx = i + 1;
+      if (pair.length < 2) {
+        notes.push("对手 " + idx + " 的提示字还差一个字，已跳过");
+        return;
+      }
+      if (pair.charAt(0) === pair.charAt(1)) {
+        notes.push("对手 " + idx + " 的两个提示字相同，已跳过");
+        return;
+      }
+      if (!INDEX.has(pair.charAt(0)) || !INDEX.has(pair.charAt(1))) {
+        notes.push("对手 " + idx + " 的提示字里有词库没有的字，已跳过");
+        return;
+      }
+      var raw = candidateList([pair.charAt(0), pair.charAt(1)]);
+      if (!raw.length) {
+        notes.push("对手 " + idx + " 的提示字在词库里组不出词，已跳过");
+        return;
+      }
+      if (allHan.length > 2) {
+        notes.push("对手 " + idx + " 多填了字，只取前两个字「" + pair + "」");
+      }
+      groups.push({
+        idx: idx,
+        pair: pair,
+        chars: [pair.charAt(0), pair.charAt(1)],
+        raw: raw
+      });
+    });
+    return { groups: groups, notes: notes };
+  }
+
+  function evaluateBases(bases, groups, threshold) {
+    var out = [];
+    bases.forEach(function (base) {
+      if (base.minF < threshold) return;
+      var states = [], ok = true;
+      for (var i = 0; i < groups.length; i++) {
+        var g = groups[i];
+        var sols = [];
+        g.raw.forEach(function (c) {
+          if (c.minF < threshold) return;
+          var cm = INDEX.get(c.char);
+          var e = cm && cm.get(base.char);
+          if (!e || e.maxF < threshold) return;
+          sols.push({
+            char: c.char,
+            hintMin: c.minF,
+            hintSum: c.sumF,
+            baseF: e.maxF,
+            baseWord: bestWord(c.char, base.char),
+            hintWords: g.chars.map(function (h) { return bestWord(h, c.char); }).join("、"),
+            score: Math.min(c.minF, e.maxF),
+            sumF: c.sumF + e.maxF
+          });
+        });
+        if (!sols.length) { ok = false; break; }
+        sols.sort(function (p, q) {
+          return (q.score - p.score) || (q.sumF - p.sumF) || (rankOf(p.char) - rankOf(q.char));
+        });
+        states.push({ group: g, sols: sols });
+      }
+      if (!ok) return;
+      var scores = states.map(function (s) { return s.sols[0].score; });
+      var score = Math.min.apply(null, [base.minF].concat(scores));
+      var sumF = base.sumF + states.reduce(function (acc, s) { return acc + s.sols[0].sumF; }, 0);
+      var totalCands = states.reduce(function (acc, s) { return acc + s.sols.length; }, 0);
+      out.push({ base: base, states: states, score: score, sumF: sumF, totalCands: totalCands });
+    });
+    out.sort(function (p, q) {
+      return (q.score - p.score) || (q.sumF - p.sumF) ||
+        (p.totalCands - q.totalCands) || (rankOf(p.base.char) - rankOf(q.base.char));
+    });
+    return out;
+  }
+
+  function evaluatePartialBases(bases, groups, threshold, maxMiss) {
+    var out = [];
+    if (!groups.length) return out;
+    bases.forEach(function (base) {
+      if (base.minF < threshold) return;
+      var states = [], missed = [], bestScores = [];
+      var sumF = base.sumF, totalCands = 0;
+      var commonCount = base.minF >= STRONG_F ? 1 : 0;
+      for (var i = 0; i < groups.length; i++) {
+        var g = groups[i];
+        var sols = [];
+        g.raw.forEach(function (c) {
+          if (c.minF < threshold) return;
+          var cm = INDEX.get(c.char);
+          var e = cm && cm.get(base.char);
+          if (!e || e.maxF < threshold) return;
+          sols.push({
+            char: c.char,
+            hintMin: c.minF,
+            hintSum: c.sumF,
+            baseF: e.maxF,
+            baseWord: bestWord(c.char, base.char),
+            hintWords: g.chars.map(function (h) { return bestWord(h, c.char); }).join("、"),
+            score: Math.min(c.minF, e.maxF),
+            sumF: c.sumF + e.maxF
+          });
+        });
+        if (!sols.length) { missed.push(g); continue; }
+        sols.sort(function (p, q) {
+          return (q.score - p.score) || (q.sumF - p.sumF) || (rankOf(p.char) - rankOf(q.char));
+        });
+        states.push({ group: g, sols: sols });
+        bestScores.push(sols[0].score);
+        if (sols[0].score >= STRONG_F) commonCount++;
+        sumF += sols[0].sumF;
+        totalCands += sols.length;
+      }
+      var missCount = missed.length;
+      if (missCount > maxMiss || missCount === groups.length) return;
+      var score = Math.min.apply(null, [base.minF].concat(bestScores));
+      out.push({
+        base: base, states: states, missed: missed, missCount: missCount,
+        score: score, sumF: sumF, totalCands: totalCands, commonCount: commonCount
+      });
+    });
+    out.sort(function (p, q) {
+      return (q.commonCount - p.commonCount) || (p.missCount - q.missCount) ||
+        (q.score - p.score) || (q.sumF - p.sumF) ||
+        (p.totalCands - q.totalCands) || (rankOf(p.base.char) - rankOf(q.base.char));
+    });
+    return out;
+  }
+
+  function baseEviParts(known, p, m, bchar) {
+    return known.map(function (k) {
+      var role = k === p && k === m ? "公/我" : (k === p ? "公" : "我");
+      return { word: bestWord(k, bchar), role: role };
+    }).filter(function (part) { return part.word; });
+  }
+
+  function baseEviNode(known, p, m, bchar) {
+    var span = el("span", "base-evi");
+    var parts = baseEviParts(known, p, m, bchar);
+    parts.forEach(function (part, i) {
+      if (i) span.appendChild(document.createTextNode(" · "));
+      var w = el("b", null, part.word);
+      span.appendChild(w);
+      span.appendChild(el("small", null, "（" + part.role + "）"));
+    });
+    return span;
+  }
+
+  function chip(label, ch) {
+    var c = el("span", "chip");
+    c.appendChild(document.createTextNode(label));
+    c.appendChild(b(ch));
+    return c;
+  }
+
+  function solRow(s, isTop, baseChar) {
+    var row = el("div", "cand" + (isTop ? " top" : ""));
+    row.appendChild(el("div", "ch" + (isTop ? " top" : ""), s.char));
+    var meta = el("div", "meta");
+    var evi = el("div", "evi");
+    evi.appendChild(rich([
+      "提示：", b(s.hintWords), " → 与底「", baseChar, "」组成 ", b(s.baseWord)
+    ]));
+    meta.appendChild(evi);
+    if (s.score < STRONG_F) meta.appendChild(el("div", "note", "生僻组合"));
+    row.appendChild(meta);
+    return row;
+  }
+
+  function renderGroupBlock(host, state, baseChar) {
+    var g = state.group, sols = state.sols;
+    var block = el("div", "group-block");
+    var head = el("div", "group-head");
+    head.appendChild(el("span", "group-name", "对手 " + g.idx));
+    head.appendChild(el("span", "group-pair", g.pair.split("").join(" ")));
+    if (sols.length === 1) head.appendChild(el("span", "badge ok", "唯一"));
+    head.appendChild(el("span", "group-count", sols.length + " 个候选能解底"));
+    block.appendChild(head);
+
+    var list = el("div", "cand-list");
+    sols.slice(0, SOL_SHOW).forEach(function (s, i) {
+      list.appendChild(solRow(s, i === 0, baseChar));
+    });
+    block.appendChild(list);
+
+    if (sols.length > SOL_SHOW) {
+      var more = el("details", "cand-more");
+      more.appendChild(el("summary", null, "另有 " + (sols.length - SOL_SHOW) + " 个能解底的候选"));
+      var rest = el("div", "cand-list");
+      sols.slice(SOL_SHOW, SOL_SHOW + 40).forEach(function (s) {
+        rest.appendChild(solRow(s, false, baseChar));
+      });
+      more.appendChild(rest);
+      block.appendChild(more);
+    }
+    host.appendChild(block);
+  }
+
+  function renderBaseCard(host, r, p, m, known, isFirst, isOnly) {
+    var d = el("details", "base-card" + (isFirst ? " rec" : ""));
+    if (isFirst) d.open = true;
+    var sum = el("summary");
+    sum.appendChild(el("span", "base-ch", r.base.char));
+    if (isOnly) sum.appendChild(el("span", "badge ok", "唯一可解底"));
+    else if (isFirst) sum.appendChild(el("span", "badge ok", "推荐"));
+    if (r.score < STRONG_F) sum.appendChild(el("span", "badge warn", "生僻解"));
+    sum.appendChild(baseEviNode(known, p, m, r.base.char));
+    var scoreTag = el("span", "base-score", "最弱链 " + r.score);
+    scoreTag.title = "整条推理链中最弱的一个词频";
+    sum.appendChild(scoreTag);
+    d.appendChild(sum);
+
+    var body = el("div", "base-body");
+    var line = el("div", "answer-line");
+    line.appendChild(el("span", "answer-label", "推荐作答"));
+    line.appendChild(chip("底 ", r.base.char));
+    r.states.forEach(function (st) {
+      var c = chip("对手 " + st.group.idx + " ", st.sols[0].char);
+      if (st.sols.length > 1) c.title = "该组另有 " + (st.sols.length - 1) + " 个能解底的候选";
+      line.appendChild(c);
+    });
+    body.appendChild(line);
+
+    r.states.forEach(function (st) {
+      renderGroupBlock(body, st, r.base.char);
+    });
+    d.appendChild(body);
+    host.appendChild(d);
+  }
+
+  function renderSuspectedBaseCard(host, r, p, m, known, isFirst, totalGroups) {
+    var d = el("details", "base-card" + (isFirst ? " rec" : ""));
+    if (isFirst) d.open = true;
+    var sum = el("summary");
+    sum.appendChild(el("span", "base-ch", r.base.char));
+    sum.appendChild(el("span", "badge warn", r.missCount === 0 ? "生僻全对" : "疑似底"));
+    sum.appendChild(el("span", "badge", (totalGroups - r.missCount) + "/" + totalGroups + " 组对上"));
+    sum.appendChild(baseEviNode(known, p, m, r.base.char));
+    var scoreTag = el("span", "base-score", "最弱链 " + r.score);
+    scoreTag.title = "整条推理链中最弱的一个词频";
+    sum.appendChild(scoreTag);
+    d.appendChild(sum);
+
+    var body = el("div", "base-body");
+    if (r.missed.length) {
+      body.appendChild(el("div", "status",
+        "对不上：" + r.missed.map(function (g) {
+          return "对手 " + g.idx + "「" + g.pair + "」";
+        }).join("、") + "。可能是提示字太生僻或填错了。"));
+    } else {
+      body.appendChild(el("div", "status",
+        "这个底能对上所有提示组，但整条链里有很生僻的组词；可以重点核对。"));
+    }
+
+    var line = el("div", "answer-line");
+    line.appendChild(el("span", "answer-label", "可先试"));
+    line.appendChild(chip("底 ", r.base.char));
+    r.states.forEach(function (st) {
+      var c = chip("对手 " + st.group.idx + " ", st.sols[0].char);
+      if (st.sols.length > 1) c.title = "该组另有 " + (st.sols.length - 1) + " 个候选";
+      line.appendChild(c);
+    });
+    body.appendChild(line);
+
+    r.states.forEach(function (st) {
+      renderGroupBlock(body, st, r.base.char);
+    });
+    r.missed.forEach(function (g) {
+      var block = el("div", "group-block");
+      var head = el("div", "group-head");
+      head.appendChild(el("span", "group-name", "对手 " + g.idx));
+      head.appendChild(el("span", "group-pair", g.pair.split("").join(" ")));
+      head.appendChild(el("span", "badge warn", "未对上"));
+      block.appendChild(head);
+      block.appendChild(el("div", "status",
+        "这一组没有候选能与「" + r.base.char + "」组词，可能提示字太生僻或填错了。"));
+      body.appendChild(block);
+    });
+
+    d.appendChild(body);
+    host.appendChild(d);
+  }
+
+  function renderBaseList(host, results) {
+    var list = el("div", "base-list");
+    results.slice(0, 20).forEach(function (r, i) {
+      var item = el("div", "base-item" + (i === 0 ? " top" : ""));
+      item.appendChild(el("div", "base-rank", "#" + (i + 1)));
+      item.appendChild(el("div", "base-ch", r.base.char));
+      var meta = el("div", "base-meta");
+      var eviParts = r.base.ev.map(function (e) {
+        return e.words.slice().sort(function (a, b) { return b[1] - a[1]; })[0][0];
+      });
+      var evi = el("div");
+      evi.appendChild(rich(["证据：", b(eviParts.join("、"))]));
+      meta.appendChild(evi);
+      meta.appendChild(el("div", "sub", "最弱词频 " + r.base.minF));
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+    host.appendChild(list);
+    if (results.length > 20) {
+      host.appendChild(el("div", "status", "另有 " + (results.length - 20) + " 个底未显示，可以再填对手提示缩小范围"));
+    }
+  }
+
+  function renderRareBaseList(host, extraResults) {
+    if (!extraResults.length) return;
+    var ex = el("details", "cand-more");
+    ex.appendChild(el("summary", null, "另有 " + extraResults.length + " 个底需要生僻组词（点开看）"));
+    var list = el("div", "base-list");
+    extraResults.slice(0, 20).forEach(function (r) {
+      var item = el("div", "base-item");
+      item.appendChild(el("div", "base-ch", r.base.char));
+      var meta = el("div", "base-meta");
+      var evi = el("div");
+      var words = r.base.ev.map(function (e) {
+        return e.words.slice().sort(function (a, b) { return b[1] - a[1]; })[0][0];
+      });
+      evi.appendChild(rich(["证据：", b(words.join("、"))]));
+      meta.appendChild(evi);
+      meta.appendChild(el("div", "sub", "最弱链 " + r.score));
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+    if (extraResults.length > 20) {
+      list.appendChild(el("div", "status", "另有 " + (extraResults.length - 20) + " 个未列出"));
+    }
+    ex.appendChild(list);
+    ex.appendChild(el("div", "status", "勾选「显示生僻候选 / 生僻解」可看每个底的详细候选。"));
+    host.appendChild(ex);
+  }
+
+  function renderPlain(groups, host) {
+    if (!groups.length) {
+      host.appendChild(el("div", "empty", "先填公共字和我的字，或至少一位对手的两位提示字"));
+      return;
+    }
+    var showWeak = document.getElementById("show-weak").checked;
+    groups.forEach(function (g) {
+      var card = el("div", "clue-card");
+      var head = el("div", "clue-head");
+      head.appendChild(el("span", "clue-pair", g.pair.split("").join(" ")));
+      head.appendChild(el("span", "badge", "对手 " + g.idx));
+      head.appendChild(el("span", "badge", g.raw.length + " 个候选"));
+      card.appendChild(head);
+      var strong = g.raw.filter(function (c) { return c.minF >= STRONG_F; });
+      var weak = g.raw.filter(function (c) { return c.minF < STRONG_F; });
+      var show = showWeak ? g.raw.slice(0, 20) : (strong.length ? strong.slice(0, 8) : g.raw.slice(0, 3));
+      var list = el("div", "cand-list");
+      show.forEach(function (c, i) {
+        var row = el("div", "cand" + (i === 0 && strong.length ? " top" : ""));
+        row.appendChild(el("div", "ch" + (i === 0 && strong.length ? " top" : ""), c.char));
+        var meta = el("div", "meta");
+        var evi = el("div", "evi");
+        evi.appendChild(rich([b(evidenceText(c)), " · 最弱词频 " + c.minF]));
+        meta.appendChild(evi);
+        if (c.minF < STRONG_F) meta.appendChild(el("div", "note", "生僻组合，未必是真答案"));
+        row.appendChild(meta);
+        list.appendChild(row);
+      });
+      card.appendChild(list);
+      if (!showWeak && weak.length) {
+        card.appendChild(el("div", "status", "另有 " + weak.length + " 个生僻候选（勾选「显示生僻候选 / 生僻解」可看）"));
+      }
+      host.appendChild(card);
+    });
+    host.appendChild(el("div", "status", "填上公共字和我的字后，这里只保留能解出底的候选"));
+  }
+
+  function runMergedSolve() {
+    var out = document.getElementById("guess-out");
+    var status = document.getElementById("guess-status");
+    out.innerHTML = "";
+    status.textContent = "计算中…";
+
+    var p = readChar(publicInput);
+    var m = readChar(baseMineInput);
+    var collected = collectGroups();
+    var groups = collected.groups;
+    var notes = collected.notes.slice();
+    var showWeak = document.getElementById("show-weak").checked;
+
+    if (p && !INDEX.has(p)) {
+      status.textContent = "";
+      out.appendChild(el("div", "empty", "公共字「" + p + "」不在词库里"));
+      return;
+    }
+    if (m && !INDEX.has(m)) {
+      status.textContent = "";
+      out.appendChild(el("div", "empty", "我的字「" + m + "」不在词库里"));
+      return;
+    }
+
+    var known = [];
+    if (p) known.push(p);
+    if (m && m !== p) known.push(m);
+
+    if (!known.length) {
+      status.textContent = "未加底的约束";
+      notes.forEach(function (note) { out.appendChild(el("div", "status", note)); });
+      renderPlain(groups, out);
+      return;
+    }
+    if (p && m && p === m) notes.push("公共字和我的字相同，按一个字约束");
+    if (known.length === 1) notes.push("只填了一个约束字，底候选会比较多");
+
+    setTimeout(function () {
+      status.textContent = "";
+      var bases = baseCandidates(known);
+      if (!bases || !bases.length) {
+        status.textContent = "";
+        out.appendChild(el("div", "empty",
+          "「" + known.join("」「") + "」在词库里没有共同组词，可能填错了"));
+        return;
+      }
+
+      var strict = evaluateBases(bases, groups, STRONG_F);
+      var all = evaluateBases(bases, groups, WEAK_F);
+      var results, relaxed = false, extraResults = [];
+      if (showWeak) {
+        results = all;
+      } else if (strict.length) {
+        results = strict;
+        var strictChars = {};
+        strict.forEach(function (r) { strictChars[r.base.char] = 1; });
+        extraResults = all.filter(function (r) { return !strictChars[r.base.char]; });
+      } else {
+        results = all;
+        relaxed = true;
+      }
+
+      var partial = [], maxMiss = 0;
+      if (!results.length && groups.length) {
+        maxMiss = Math.min(2, groups.length - 1);
+        if (maxMiss > 0) partial = evaluatePartialBases(bases, groups, 1, maxMiss);
+      }
+
+      var rawTotal = groups.reduce(function (n, g) { return n + g.raw.length; }, 0);
+      var viable = {};
+      var viableCount = 0;
+      results.forEach(function (r) {
+        r.states.forEach(function (st) {
+          st.sols.forEach(function (s) {
+            var key = st.group.idx + "|" + s.char;
+            if (!viable[key]) { viable[key] = 1; viableCount++; }
+          });
+        });
+      });
+
+      var statusLine = el("div", "status-line");
+      var bits;
+      if (!results.length && partial.length) {
+        bits = ["疑似底 " + partial.length + " 个", "允许最多 " + maxMiss + " 组对不上", "词频≥1"];
+      } else {
+        bits = ["底候选 " + results.length + " 个"];
+        if (groups.length) bits.push("提示候选 " + rawTotal + " → " + viableCount + " 个能解底");
+        bits.push(showWeak ? "含生僻词（词频≥5）" : (relaxed ? "已放宽到生僻词（词频≥5）" : "只用常见词（词频≥30）"));
+      }
+      statusLine.appendChild(el("span", "note", bits.join(" · ")));
+      if (!results.length && partial.length) {
+        statusLine.appendChild(el("span", "badge warn", "常见词无解"));
+      } else {
+        if (results.length === 1 && results[0].states.length && results[0].states.every(function (st) { return st.sols.length === 1; })) {
+          statusLine.appendChild(el("span", "badge ok", "整桌唯一解"));
+        }
+        if (extraResults.length) {
+          statusLine.appendChild(el("span", "badge", "另有 " + extraResults.length + " 个生僻解"));
+        }
+      }
+      out.appendChild(statusLine);
+
+      if (!results.length && partial.length) {
+        out.appendChild(el("div", "status",
+          "常见词里没有能全对的底；下面是疑似底，先按「对上的常见组数」排序。对不上的组会单独标出，可能是提示字太生僻或填错了。"));
+      } else if (relaxed) {
+        out.appendChild(el("div", "status",
+          "常见词里找不到能同时解出底的组合，已放宽到词频 ≥5 的生僻组词；结果仅供参考。"));
+      }
+      notes.forEach(function (note) { out.appendChild(el("div", "status", note)); });
+
+      if (!results.length) {
+        if (partial.length) {
+          partial.slice(0, MAX_SUSPECTS).forEach(function (r, i) {
+            renderSuspectedBaseCard(out, r, p, m, known, i === 0, groups.length);
+          });
+          if (partial.length > MAX_SUSPECTS) {
+            out.appendChild(el("div", "status", "另有 " + (partial.length - MAX_SUSPECTS) + " 个疑似底未显示，可以补齐提示字后再算。"));
+          }
+          return;
+        }
+        out.appendChild(el("div", "empty", "这些提示字拼不出任何一个共同的底"));
+        out.appendChild(el("div", "status", "可以检查公共字、我的字和提示字；或者少填一组，先看哪些字能解底。"));
+        if (groups.length) {
+          var dbg = el("details", "cand-more");
+          dbg.appendChild(el("summary", null, "查看未加底约束的候选"));
+          var dbgBody = el("div");
+          renderPlain(groups, dbgBody);
+          dbg.appendChild(dbgBody);
+          out.appendChild(dbg);
+        }
+        return;
+      }
+
+      if (!groups.length) {
+        renderBaseList(out, results);
+        renderRareBaseList(out, extraResults);
+        out.appendChild(el("div", "status", "再把每位对手的两个提示字填上，就能继续筛掉解不出底的隐藏字。"));
+        return;
+      }
+
+      results.slice(0, MAX_BASE_CARDS).forEach(function (r, i) {
+        renderBaseCard(out, r, p, m, known, i === 0, results.length === 1);
+      });
+      if (results.length > MAX_BASE_CARDS) {
+        var more = el("details", "cand-more");
+        more.appendChild(el("summary", null, "另有 " + (results.length - MAX_BASE_CARDS) + " 个底也能解出"));
+        var chips = el("div", "chips");
+        results.slice(MAX_BASE_CARDS).forEach(function (r) {
+          var c = el("span", "chip plain");
+          c.appendChild(b(r.base.char));
+          c.appendChild(document.createTextNode(" " + (r.base.ev.map(function (e) {
+            return e.words.slice().sort(function (a, b) { return b[1] - a[1]; })[0][0];
+          }).join(" / "))));
+          chips.appendChild(c);
+        });
+        more.appendChild(chips);
+        out.appendChild(more);
+      }
+      renderRareBaseList(out, extraResults);
+    }, 20);
+  }
+
+  document.getElementById("guess-solve").addEventListener("click", runMergedSolve);
+  document.getElementById("my-char").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) document.getElementById("clue-solve").click();
+  });
+  publicInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) runMergedSolve();
+  });
+  baseMineInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) runMergedSolve();
+  });
+  guessRows.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.isComposing) return;
+    var inp = e.target;
+    if (!inp || inp.tagName !== "INPUT") return;
+    runMergedSolve();
+  });
+
+  // 两处“我的隐藏字”互相同步
+  function syncMine(src, dst) {
+    src.addEventListener("input", function (e) {
+      if (e.isComposing) return;
+      var v = hanOnly(src.value).slice(0, 1);
+      if (dst.value !== v) dst.value = v;
+    });
+  }
+  syncMine(document.getElementById("my-char"), baseMineInput);
+  syncMine(baseMineInput, document.getElementById("my-char"));
+
+  // ---------- 单机练习 ----------
+
+  var PRACTICE_ROUNDS = 5;
+  var PRACTICE_POOL = null;
+  var PRACTICE_CLUE_CACHE = new Map();
+
+  var practice = {
+    players: 5,
+    round: 0,
+    total: 0,
+    current: null,
+    history: []
+  };
+  window.__cjPractice = practice;
+
+  function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function practiceBasePool() {
+    if (PRACTICE_POOL) return PRACTICE_POOL;
+    var pool = [];
+    RANK.forEach(function (rank, ch) {
+      if (rank > 1600) return;
+      var m = INDEX.get(ch);
+      if (!m) return;
+      var cnt = 0;
+      m.forEach(function (e) { if (e.maxF >= STRONG_F) cnt++; });
+      if (cnt >= 10) pool.push(ch);
+    });
+    PRACTICE_POOL = pool;
+    return pool;
+  }
+
+  function practiceNeighbors(x) {
+    var m = INDEX.get(x);
+    if (!m) return [];
+    var list = [];
+    m.forEach(function (e, ch) {
+      if (e.maxF < STRONG_F || ch === x) return;
+      var r = RANK.get(ch);
+      if (r == null || r > 2500) return;
+      list.push(ch);
+    });
+    list.sort(function (a, b) { return rankOf(a) - rankOf(b); });
+    return list;
+  }
+
+  function sampleDistinct(list, k) {
+    if (list.length < k) return null;
+    var pool = list.slice(0, Math.min(list.length, 48));
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    return pool.slice(0, k);
+  }
+
+  function cachedClues(h) {
+    if (PRACTICE_CLUE_CACHE.has(h)) return PRACTICE_CLUE_CACHE.get(h);
+    var res = findClues(h, true, true, "common");
+    PRACTICE_CLUE_CACHE.set(h, res);
+    return res;
+  }
+
+  function pickPracticeHints(h, X, P, M, opps) {
+    var forbid = {};
+    [X, P, M, h].forEach(function (c) { forbid[c] = 1; });
+    opps.forEach(function (c) { if (c !== h) forbid[c] = 1; });
+    var res = cachedClues(h);
+    var list = res.list.filter(function (r) { return !forbid[r.a] && !forbid[r.b]; });
+    if (!list.length) return null;
+    var good = list.filter(function (r) { return r.real.length === 0 && r.weak.length <= 2; });
+    var pick = good.length ? pickRandom(good.slice(0, Math.min(good.length, 12)))
+      : pickRandom(list.slice(0, Math.min(list.length, 8)));
+    if (!pick) return null;
+    return [pick.a, pick.b];
+  }
+
+  function validatePracticeRound(X, P, M, groups) {
+    var bases = baseCandidates([P, M]);
+    if (!bases || !bases.length) return false;
+    var strictBases = bases.filter(function (b) { return b.minF >= STRONG_F; });
+    if (strictBases.length < 2) return false;
+    if (!strictBases.some(function (b) { return b.char === X; })) return false;
+    var groupObjs = [];
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var raw = candidateList([g.a, g.b]);
+      if (!raw.length) return false;
+      groupObjs.push({ idx: i + 1, pair: g.a + g.b, chars: [g.a, g.b], raw: raw });
+    }
+    var results = evaluateBases(bases, groupObjs, STRONG_F);
+    if (!results.length || results[0].base.char !== X) return false;
+    var top = results[0];
+    for (var j = 0; j < groups.length; j++) {
+      var st = top.states[j];
+      if (!st) return false;
+      if (!st.sols.some(function (s) { return s.char === groups[j].char; })) return false;
+    }
+    return true;
+  }
+
+  function generatePracticeRound(players) {
+    var need = players + 1;
+    var pool = practiceBasePool();
+    if (!pool.length) return null;
+    var last = null;
+    var t0 = Date.now();
+    for (var attempt = 0; attempt < 14; attempt++) {
+      var X = pickRandom(pool);
+      var neigh = practiceNeighbors(X);
+      if (neigh.length < need + 3) continue;
+      var picks = sampleDistinct(neigh, need);
+      if (!picks) continue;
+      var P = picks[0], M = picks[1], opps = picks.slice(2);
+      var groups = [], ok = true;
+      for (var i = 0; i < opps.length; i++) {
+        var pair = pickPracticeHints(opps[i], X, P, M, opps);
+        if (!pair) { ok = false; break; }
+        groups.push({ char: opps[i], a: pair[0], b: pair[1] });
+      }
+      if (!ok) continue;
+      last = { X: X, P: P, M: M, opps: groups, relaxed: true };
+      if (validatePracticeRound(X, P, M, groups)) {
+        last.relaxed = false;
+        return last;
+      }
+      if (Date.now() - t0 > 2500) break;
+    }
+    return last;
+  }
+
+  function practiceSlot(label, ch, cls) {
+    var s = el("div", "slot" + (cls ? " " + cls : ""));
+    s.appendChild(el("small", null, label));
+    s.appendChild(el("b", null, ch));
+    return s;
+  }
+
+  function renderPractice() {
+    var out = document.getElementById("practice-out");
+    var cur = practice.current;
+    out.innerHTML = "";
+    if (!cur) {
+      out.appendChild(el("div", "empty", "点「开始新的一局」：会像真人局一样摆好公共字、我的字和对手提示；你负责猜出对手的隐藏字和中央谜底。"));
+      return;
+    }
+    var max = PRACTICE_ROUNDS * (practice.players + 2);
+    var score = el("div", "practice-score");
+    score.appendChild(rich(["第 ", b(String(practice.round + 1)), " / ", String(PRACTICE_ROUNDS), " 轮"]));
+    score.appendChild(rich(["总分 ", b(String(practice.total)), " / ", String(max)]));
+    if (cur.submitted) score.appendChild(el("span", "badge ok", "本轮 +" + cur.roundScore));
+    out.appendChild(score);
+
+    var board = el("div", "practice-board");
+    board.appendChild(practiceSlot("中央谜底", cur.submitted ? cur.X : "?", cur.submitted ? "mine" : ""));
+    board.appendChild(practiceSlot("公共字", cur.P, ""));
+    board.appendChild(practiceSlot("我的字", cur.M, "mine"));
+    out.appendChild(board);
+
+    cur.opps.forEach(function (g, i) {
+      var card = el("div", "clue-card" + (cur.submitted ? " unique" : ""));
+      var head = el("div", "clue-head");
+      head.appendChild(el("span", "group-name", "对手 " + (i + 1)));
+      head.appendChild(el("span", "clue-pair", g.a + " " + g.b));
+      if (cur.submitted) head.appendChild(el("span", "badge ok", "真身 " + g.char));
+      card.appendChild(head);
+      card.appendChild(el("div", "clue-answer", "哪一个字，能分别与它们组词？"));
+      out.appendChild(card);
+    });
+
+    var grid = el("div", "answer-grid");
+    for (var i = 0; i < practice.players; i++) {
+      var wrap = el("label", "answer-card");
+      wrap.appendChild(el("span", null, cur.submitted ? "作答 " + (i + 1) : "作答卡 " + (i + 1)));
+      var inp = document.createElement("input");
+      inp.inputMode = "text";
+      inp.setAttribute("aria-label", "作答卡 " + (i + 1));
+      inp.value = (cur.guesses && cur.guesses[i]) || "";
+      inp.disabled = !!cur.submitted;
+      wrap.appendChild(inp);
+      var judge = el("span", "judge");
+      if (cur.submitted) {
+        var res = cur.judges[i];
+        if (res) {
+          judge.textContent = res.text;
+          judge.className = "judge " + (res.hit ? "hit" : "miss");
+          wrap.className = "answer-card " + (res.hit ? "hit" : (res.own ? "own" : "miss"));
+        }
+      }
+      wrap.appendChild(judge);
+      grid.appendChild(wrap);
+    }
+    out.appendChild(grid);
+
+    var actions = el("div", "practice-actions");
+    if (!cur.submitted) {
+      var submit = el("button", "primary", "提交本轮");
+      submit.addEventListener("click", submitPractice);
+      actions.appendChild(submit);
+    } else if (practice.round + 1 < PRACTICE_ROUNDS) {
+      var next = el("button", "primary", "下一轮");
+      next.addEventListener("click", nextPracticeRound);
+      actions.appendChild(next);
+    } else {
+      actions.appendChild(el("span", "badge ok", "本局结束"));
+      var again = el("button", "primary", "再来一局");
+      again.addEventListener("click", startPracticeGame);
+      actions.appendChild(again);
+    }
+    out.appendChild(actions);
+    if (cur.relaxed) {
+      out.appendChild(el("div", "status", "这一轮是自动生成的，底可能不唯一；可以用求解器的思路推一推。"));
+    }
+  }
+
+  function submitPractice() {
+    var cur = practice.current;
+    if (!cur || cur.submitted) return;
+    var out = document.getElementById("practice-out");
+    var inputs = out.querySelectorAll(".answer-card input");
+    cur.guesses = Array.prototype.map.call(inputs, function (i) { return readChar(i); });
+    var oppChars = cur.opps.map(function (g) { return g.char; });
+    var scored = {};
+    var roundScore = 0;
+    cur.judges = cur.guesses.map(function (g) {
+      if (!g) return { hit: false, text: "" };
+      if (g === cur.M) return { hit: false, own: true, text: "你自己的字" };
+      if (g === cur.P) return { hit: false, text: "公共字" };
+      if (g === cur.X) {
+        if (scored[g]) return { hit: false, text: "重复" };
+        scored[g] = 1; roundScore += 3;
+        return { hit: true, text: "谜底 +3" };
+      }
+      if (oppChars.indexOf(g) >= 0) {
+        if (scored[g]) return { hit: false, text: "重复" };
+        scored[g] = 1; roundScore += 1;
+        return { hit: true, text: "隐藏字 +1" };
+      }
+      return { hit: false, text: "未猜中" };
+    });
+    cur.roundScore = roundScore;
+    cur.submitted = true;
+    practice.total += roundScore;
+    practice.history.push({ round: practice.round + 1, score: roundScore });
+    renderPractice();
+  }
+
+  function nextPracticeRound() {
+    practice.round++;
+    practice.current = null;
+    renderPractice();
+    generateNextPracticeRound();
+  }
+
+  function generateNextPracticeRound() {
+    var status = document.getElementById("practice-status");
+    status.textContent = "出题中…";
+    setTimeout(function () {
+      var round = generatePracticeRound(practice.players);
+      status.textContent = "";
+      if (!round) {
+        document.getElementById("practice-out").appendChild(el("div", "empty", "出题失败，再点一次「开始新的一局」"));
+        return;
+      }
+      practice.current = round;
+      renderPractice();
+    }, 20);
+  }
+
+  function startPracticeGame() {
+    practice.players = parseInt(document.getElementById("practice-players").value, 10) || 5;
+    practice.round = 0;
+    practice.total = 0;
+    practice.history = [];
+    practice.current = null;
+    renderPractice();
+    generateNextPracticeRound();
+  }
+
+  var modeSolverBtn = document.getElementById("mode-solver");
+  var modePracticeBtn = document.getElementById("mode-practice");
+  function setMode(mode) {
+    document.getElementById("solver-view").hidden = mode !== "solver";
+    document.getElementById("practice-view").hidden = mode !== "practice";
+    modeSolverBtn.classList.toggle("on", mode === "solver");
+    modePracticeBtn.classList.toggle("on", mode === "practice");
+    if (mode === "practice" && !practice.current && practice.round === 0 && practice.history.length === 0) {
+      startPracticeGame();
+    }
+  }
+  modeSolverBtn.addEventListener("click", function () { setMode("solver"); });
+  modePracticeBtn.addEventListener("click", function () { setMode("practice"); });
+  document.getElementById("practice-start").addEventListener("click", startPracticeGame);
+
+  // ---------- 初始化 ----------
+
+  addGuessRow();
+  addGuessRow();
+  addGuessRow();
+  addGuessRow();
+  addGuessRow();
+  document.getElementById("word-data").remove();
+})();
+</script>
+</body>
+</html>
