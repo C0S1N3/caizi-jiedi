@@ -2,7 +2,7 @@
 
 A self-contained word-game solver for **猜字解底** (guess the hidden character, then the central answer). No install, no network, no account — open the page and type.
 
-**在线演示：** [GitHub Pages](https://c0sin3.github.io/caizi-jiedi/)
+**在线演示：** [Qoder Sites](https://caizi-jiedi-f9d6h843g0z.qoder.zone/) · [GitHub Pages](https://c0sin3.github.io/caizi-jiedi/)
 
 [English README](README.md)
 
@@ -41,6 +41,7 @@ A self-contained word-game solver for **猜字解底** (guess the hidden charact
 ## 说明
 
 - 页面按一局的顺序排：先给自己出提示，再用公共字、我的字和对手提示猜字解底；对手不满五位时留空即可。
+- 界面参照实体桌游：中央谜底做成金色「?」牌，解出来就填上去；每位对手固定一个玩家配色（蓝、绿、红、黄、紫）。
 - 「单机练习」和求解器共用同一份词库与判定逻辑，出的题都可以用求解器的思路解开。
 - 单文件，无依赖，无追踪，不发任何请求。
 - 候选只是「词库里说得通」的字，不保证是对方心里的那一个；判断仍要结合语境。

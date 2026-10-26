@@ -4,3 +4,5 @@ dist/
 _dicts/
 _clover/
 __pycache__/
+.toy-assets/
+.toy-bundle/

@@ -7,74 +7,231 @@
 <meta name="description" content="猜字解底通用求解器：先给自己的隐藏字找提示组合；再输入公共字、我的字和别人的提示，只保留能解出底的候选。纯本地运行，可离线使用。">
 <style>
   :root {
-    --ink: #2f2a23;
-    --sub: #8a8071;
-    --line: #e4dccb;
-    --paper: #faf7f0;
-    --card: #fffdf8;
+    --ink: #2a251d;
+    --sub: #7c7263;
+    --line: #e6dcc6;
+    --card: #fffdf6;
+    --card2: #f9f2e2;
     --accent: #8c6b2f;
+    --gold: #c69a3c;
     --good: #1c6b45;
     --warn: #a2501f;
+    --teal: #1f6b5c;
+    --p1: #2684ab;
+    --p2: #298260;
+    --p3: #d8483b;
+    --p4: #b47a16;
+    --p5: #8155a6;
+    --p6: #c96a17;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { min-height: 100%; background: #14382f; }
   body {
     margin: 0;
-    background: var(--paper);
+    min-height: 100vh;
     color: var(--ink);
-    font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font: 15px/1.75 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: #14382f;
   }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 60px; }
-  header h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: 2px; }
-  header p { margin: 0 0 20px; color: var(--sub); font-size: 14px; }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 460px at 50% -12%, rgba(96, 190, 165, .26), transparent 62%),
+      radial-gradient(760px 420px at 8% 110%, rgba(198, 154, 60, .18), transparent 62%),
+      radial-gradient(rgba(255, 255, 255, .045) 1px, transparent 1.3px),
+      radial-gradient(rgba(0, 0, 0, .05) 1px, transparent 1.3px);
+    background-size: auto, auto, 6px 6px, 8px 8px;
+    background-position: 0 0, 0 0, 0 0, 3px 4px;
+  }
+  ::selection { background: rgba(198, 154, 60, .38); }
+  .wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 26px 16px 56px; }
+
+  /* ---------- 招牌 ---------- */
+  header.board-head {
+    display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+    padding: 16px 20px; margin-bottom: 18px;
+    border-radius: 20px;
+    background: linear-gradient(158deg, rgba(255, 253, 246, .97), rgba(246, 238, 218, .94));
+    border: 1px solid rgba(255, 255, 255, .55);
+    box-shadow: 0 16px 36px rgba(4, 20, 17, .40);
+  }
+  .logo { display: flex; align-items: center; gap: 5px; flex: none; }
+  .logo .tile {
+    width: 42px; height: 46px; border-radius: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 26px/1 "Songti SC", "STSong", "SimSun", serif;
+    color: #fffdf6;
+    background: linear-gradient(180deg, #3a9ac0, #2684ab);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .26), inset 0 1px 0 rgba(255, 255, 255, .32);
+  }
+  .logo .tile:nth-child(2) { background: linear-gradient(180deg, #3aa07b, #298260); }
+  .logo .tile:nth-child(3) { background: linear-gradient(180deg, #e2685a, #d8483b); }
+  .logo .tile:nth-child(4) { background: linear-gradient(180deg, #c98c22, #b47a16); }
+  .logo .arrow { color: #c69a3c; font-size: 20px; margin: 0 2px; }
+  .logo .q {
+    background: linear-gradient(180deg, #fffdf3, #f2e4c2);
+    color: #b5892c; border: 2px dashed #d6b678;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .12), inset 0 2px 5px rgba(180, 150, 90, .28);
+  }
+  header h1 { font-size: 25px; margin: 0 0 4px; letter-spacing: 3px; }
+  header p { margin: 0; color: var(--sub); font-size: 14px; }
+  header p b { color: var(--teal); }
+  .head-text { flex: 1; min-width: 240px; }
+
+  /* ---------- 卡片 ---------- */
   .card {
-    background: var(--card);
+    position: relative;
+    background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 10px rgba(80, 65, 40, .05);
+    border-radius: 18px;
+    padding: 18px 18px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 14px 30px rgba(5, 22, 19, .30), inset 0 1px 0 rgba(255, 255, 255, .85);
   }
-  h2 { font-size: 17px; margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  h2 .tag { font-size: 12px; font-weight: normal; color: var(--sub); }
-  details.rules summary { cursor: pointer; font-weight: 600; color: var(--accent); }
-  details.rules ul { margin: 10px 0 0; padding-left: 20px; color: var(--sub); font-size: 14px; }
-  details.rules li { margin: 4px 0; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card.c-hint { --mark: #b47a16; }
+  .card.c-solve { --mark: #2684ab; }
+  .card.c-practice { --mark: #8155a6; }
+  h2 {
+    font-size: 17px; margin: 0 0 14px; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  h2::before {
+    content: ""; width: 13px; height: 13px; flex: none; border-radius: 4px;
+    background: var(--mark, var(--accent));
+    box-shadow: 0 2px 5px rgba(90, 70, 30, .35);
+  }
+  h2 .tag {
+    font-size: 12px; font-weight: normal; color: var(--sub);
+    background: #f6efdd; border: 1px solid #e8dfc8; border-radius: 999px; padding: 2px 10px;
+  }
+  details.rules summary {
+    cursor: pointer; font-weight: 700; color: #7a5d1c; list-style: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  details.rules summary::-webkit-details-marker { display: none; }
+  details.rules summary::before { content: "▸"; color: var(--gold); transition: transform .15s; }
+  details.rules[open] summary::before { transform: rotate(90deg); }
+  details.rules ul { margin: 12px 0 0; padding-left: 20px; color: var(--sub); font-size: 14px; }
+  details.rules li { margin: 5px 0; }
+  details.rules li b { color: var(--warn); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ---------- 表单 ---------- */
   input[type="text"], input:not([type]) {
-    width: 56px; height: 48px; text-align: center;
-    font-size: 22px; color: var(--ink);
-    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    width: 58px; height: 52px; text-align: center;
+    font: 600 24px/1 "Songti SC", "STSong", "SimSun", serif; color: #24352f;
+    background: linear-gradient(180deg, #ffffff, #fdfaf1);
+    border: 1px solid #ded1b6; border-radius: 12px;
+    box-shadow: inset 0 2px 4px rgba(120, 100, 60, .10);
     outline: none; font-family: inherit;
   }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(140, 107, 47, .12); }
+  input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(198, 154, 60, .26); }
   input.pair-input {
-    width: 118px; padding: 0 10px; text-align: left;
-    font-size: 20px; letter-spacing: 7px;
+    width: 132px; padding: 0 12px; text-align: left;
+    font-size: 22px; letter-spacing: 8px;
   }
-  input.pair-input::placeholder { font-size: 13px; letter-spacing: 0; color: var(--sub); }
-  .base-fields { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-  .base-fields label { display: flex; gap: 8px; align-items: center; color: var(--sub); font-size: 13px; }
+  input.pair-input::placeholder { font: 13px/1 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; letter-spacing: 0; color: #b3a894; }
+  input[type="checkbox"] { accent-color: var(--teal); width: 16px; height: 16px; }
+  .base-fields { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; margin-bottom: 14px; }
+  .field-card {
+    display: flex; flex-direction: column; gap: 8px; justify-content: center;
+    padding: 11px 14px 13px; min-width: 158px;
+    border-radius: 16px; border: 1px solid #e2d7bd;
+    background: linear-gradient(180deg, #fffef9, #f7f0df);
+    box-shadow: 0 6px 16px rgba(90, 70, 40, .10), inset 0 1px 0 #fff;
+  }
+  .field-card.pub { --mark: #1c6b45; }
+  .field-card.mine { --mark: #298260; }
+  .fc-label { font-size: 12px; color: var(--sub); display: flex; align-items: center; gap: 7px; }
+  .fc-label::before {
+    content: ""; width: 9px; height: 9px; border-radius: 3px; flex: none;
+    background: var(--mark, var(--accent));
+  }
+  .fc-label i {
+    font-style: normal; font-size: 11px; color: #8a6a1e;
+    background: #f6eaca; border: 1px solid #e7d7aa; border-radius: 999px; padding: 1px 8px;
+  }
   button {
     font-family: inherit; font-size: 14px; cursor: pointer;
-    border-radius: 10px; border: 1px solid var(--line);
-    background: #fff; color: var(--ink); padding: 9px 16px; min-height: 44px;
+    border-radius: 12px; border: 1px solid #ddd0b2;
+    background: linear-gradient(180deg, #fffdf6, #f4eddb);
+    color: #3b352a; padding: 10px 18px; min-height: 46px;
+    box-shadow: 0 4px 10px rgba(90, 70, 40, .10), inset 0 1px 0 #fff;
   }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  button.ghost { color: var(--sub); }
+  button:hover { filter: brightness(1.03); }
+  button.primary {
+    background: linear-gradient(180deg, #2a8b76, #18604f);
+    border-color: #145646; color: #fffdf6; font-weight: 700;
+    box-shadow: 0 8px 18px rgba(10, 70, 58, .30), inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+  button.ghost { color: var(--sub); background: transparent; box-shadow: none; }
   button.mini { min-height: 34px; padding: 4px 10px; font-size: 13px; }
   button:active { transform: translateY(1px); }
-  .pair-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-  .pair-row .idx { color: var(--sub); font-size: 13px; min-width: 42px; }
-  .opts { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 10px 0 0; color: var(--sub); font-size: 13px; }
+
+  /* ---------- 对手提示行 ---------- */
+  .pair-row {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .pair-row.p1, .p1 { --pc: var(--p1); }
+  .pair-row.p2, .p2 { --pc: var(--p2); }
+  .pair-row.p3, .p3 { --pc: var(--p3); }
+  .pair-row.p4, .p4 { --pc: var(--p4); }
+  .pair-row.p5, .p5 { --pc: var(--p5); }
+  .pair-row.p6, .p6 { --pc: var(--p6); }
+  .pair-row .idx {
+    display: inline-flex; align-items: center; gap: 7px;
+    color: var(--sub); font-size: 13px; min-width: 62px;
+  }
+  .pair-row .idx i {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 8px; font-style: normal;
+    font-weight: 700; font-size: 13px; color: #fff; background: var(--pc, #999);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .22);
+  }
+  .opts { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 12px 0 0; color: var(--sub); font-size: 13px; }
   .opts label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
-  .results { margin-top: 14px; }
-  .empty { color: var(--sub); text-align: center; padding: 18px 0; font-size: 14px; }
+  .opts select, .field select {
+    font-family: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid #ddd0b2;
+    border-radius: 9px; background: #fffdf6; color: var(--ink); min-height: 40px;
+  }
+
+  /* ---------- 中央谜底 ---------- */
+  .target { display: flex; align-items: center; gap: 15px; margin-bottom: 16px; }
+  .target-tile {
+    width: 76px; height: 76px; flex: none; border-radius: 17px;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 40px/1 "Songti SC", "STSong", "SimSun", serif; color: #c69a3c;
+    background: linear-gradient(180deg, #fffdf3, #f4e7c8);
+    border: 2px dashed #d9ba79;
+    box-shadow: 0 8px 18px rgba(90, 70, 30, .18), inset 0 2px 6px rgba(180, 150, 90, .25);
+    transition: transform .2s ease;
+  }
+  .target-tile.found {
+    color: #fffdf6; border-style: solid; border-color: transparent;
+    background: linear-gradient(180deg, #d8a63f, #a9791b);
+    box-shadow: 0 10px 22px rgba(120, 90, 20, .38), inset 0 1px 0 rgba(255, 255, 255, .4);
+  }
+  .target-tile.suspect {
+    color: #fffdf6; border-style: solid; border-color: transparent;
+    background: linear-gradient(180deg, #c07a45, #9c4c1c);
+    box-shadow: 0 10px 22px rgba(140, 70, 20, .35), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .target-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .target-meta b { font-size: 15px; letter-spacing: 2px; }
+  .target-meta span { color: var(--sub); font-size: 13px; }
+
+  /* ---------- 结果 ---------- */
+  .results { margin-top: 16px; }
+  .empty {
+    color: var(--sub); text-align: center; padding: 22px 10px; font-size: 14px;
+    border: 1px dashed #ddd0b4; border-radius: 14px; background: rgba(255, 255, 255, .45);
+  }
   .status { color: var(--sub); font-size: 13px; margin-bottom: 8px; }
-  .status-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 8px; }
+  .status-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 10px; }
   .status-line .note { font-size: 13px; color: var(--sub); }
   .badge {
-    font-size: 12px; padding: 2px 8px; border-radius: 999px;
-    border: 1px solid var(--line); color: var(--sub); background: #fff; font-weight: normal;
+    font-size: 12px; padding: 2px 9px; border-radius: 999px;
+    border: 1px solid #e2d8c1; color: var(--sub); background: #fffdf6; font-weight: normal;
   }
   .badge.ok { color: var(--good); border-color: #9fcbb2; background: #eef8f1; }
   .badge.warn { color: var(--warn); border-color: #e6c3aa; background: #fdf2ea; }
@@ -82,33 +239,53 @@
   .cand-list { display: flex; flex-direction: column; gap: 8px; }
   .cand {
     display: flex; gap: 12px; align-items: flex-start;
-    padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff;
+    padding: 10px 12px; border: 1px solid #e6dcc6; border-radius: 14px;
+    background: rgba(255, 255, 255, .75);
   }
   .cand.top { border-color: #cdb98d; background: #fffdf4; }
   .cand .ch {
-    font-size: 30px; line-height: 1.1; min-width: 46px; text-align: center;
-    color: var(--accent); font-weight: 600;
+    font: 700 30px/1 "Songti SC", "STSong", "SimSun", serif;
+    min-width: 48px; height: 48px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px; color: var(--teal);
+    background: linear-gradient(180deg, #fffdf5, #f2ebd6);
+    border: 1px solid #e3d8bd;
+    box-shadow: inset 0 1px 0 #fff, 0 3px 8px rgba(90, 70, 40, .12);
   }
-  .cand .ch.top { color: var(--good); }
+  .cand .ch.top {
+    color: #fffdf6; border-color: transparent;
+    background: linear-gradient(180deg, #37927c, #1f6b5c);
+    box-shadow: 0 4px 10px rgba(20, 90, 75, .28), inset 0 1px 0 rgba(255, 255, 255, .3);
+  }
   .cand .meta { flex: 1; min-width: 0; }
   .cand .evi { color: var(--sub); font-size: 13px; word-break: break-all; }
   .cand .evi b { color: var(--ink); font-weight: 600; }
   .cand .note { font-size: 12px; color: var(--warn); margin-top: 2px; }
 
   .clue-card {
-    padding: 12px; border: 1px solid var(--line); border-radius: 12px;
-    background: #fff; margin-bottom: 10px;
+    padding: 13px 14px; border: 1px solid #e6dcc6; border-radius: 14px;
+    background: rgba(255, 255, 255, .78); margin-bottom: 10px;
+    border-left: 4px solid var(--pc, #d9cdb2);
   }
-  .clue-card.unique { border-color: #9fcbb2; background: #f7fdf9; }
+  .clue-card.unique { border-color: #9fcbb2; border-left-color: var(--pc, #9fcbb2); background: #f8fdf9; }
   .clue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .clue-pair { font-size: 24px; letter-spacing: 6px; font-weight: 600; }
-  .clue-evi { margin-top: 6px; color: var(--sub); font-size: 14px; }
+  .clue-pair { display: inline-flex; gap: 7px; }
+  .clue-pair i {
+    font-style: normal; font: 700 24px/1 "Songti SC", "STSong", "SimSun", serif;
+    width: 38px; height: 42px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px; color: #2f6a5c;
+    background: linear-gradient(180deg, #fffdf5, #f2ebd6);
+    border: 1px solid #e3d8bd;
+    box-shadow: inset 0 1px 0 #fff, 0 3px 7px rgba(90, 70, 40, .12);
+  }
+  .clue-evi { margin-top: 7px; color: var(--sub); font-size: 14px; }
   .clue-evi b { color: var(--ink); }
   .rivals { margin-top: 6px; font-size: 13px; color: var(--sub); }
   .rivals .r { color: var(--warn); }
 
   .base-card {
-    border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-top: 10px;
+    border: 1px solid #e6dcc6; border-radius: 14px; background: rgba(255, 255, 255, .8); margin-top: 10px;
+    box-shadow: 0 4px 12px rgba(90, 70, 40, .07);
   }
   .base-card.rec { border-color: #cdb98d; background: #fffdf4; }
   .base-card > summary {
@@ -118,96 +295,137 @@
   .base-card > summary::-webkit-details-marker { display: none; }
   .base-card > summary::after { content: "▾"; color: var(--sub); margin-left: auto; font-size: 12px; }
   .base-card[open] > summary::after { content: "▴"; }
-  .base-ch { font-size: 32px; line-height: 1.1; font-weight: 600; color: var(--accent); min-width: 38px; text-align: center; }
-  .base-card.rec .base-ch { color: var(--good); }
+  .base-ch {
+    font: 700 32px/1 "Songti SC", "STSong", "SimSun", serif;
+    width: 56px; height: 56px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 14px; color: #8c6b2f;
+    background: linear-gradient(180deg, #fffdf3, #f4e7c8);
+    border: 1px solid #e0c98f;
+    box-shadow: inset 0 1px 0 #fff, 0 4px 10px rgba(120, 90, 30, .16);
+  }
+  .base-card.rec .base-ch {
+    color: #fffdf6; border-color: transparent;
+    background: linear-gradient(180deg, #d8a63f, #a9791b);
+    box-shadow: 0 6px 14px rgba(120, 90, 20, .30), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
   .base-evi { color: var(--sub); font-size: 13px; }
   .base-evi b { color: var(--ink); font-weight: 600; }
   .base-evi small { color: var(--sub); font-size: 11px; }
   .base-score { color: var(--sub); font-size: 12px; }
-  .base-body { padding: 0 12px 12px; border-top: 1px dashed var(--line); }
+  .base-body { padding: 0 12px 12px; border-top: 1px dashed #e2d8c1; }
 
-  .answer-line {
-    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-    padding: 10px 0 2px;
-  }
+  .answer-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0 2px; }
   .answer-label { color: var(--sub); font-size: 12px; margin-right: 2px; }
   .chip {
     display: inline-flex; align-items: baseline; gap: 5px;
-    font-size: 13px; padding: 3px 9px; border-radius: 8px;
-    border: 1px solid var(--line); background: #fff; color: var(--sub);
+    font-size: 13px; padding: 3px 10px; border-radius: 9px;
+    border: 1px solid #e2d8c1; background: #fffdf6; color: var(--sub);
   }
-  .chip b { color: var(--ink); font-size: 17px; font-weight: 600; }
+  .chip b { color: var(--ink); font: 700 17px/1 "Songti SC", "STSong", "SimSun", serif; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
-  .group-block { margin-top: 12px; }
-  .group-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-  .group-name { color: var(--sub); font-size: 13px; }
-  .group-pair { font-size: 18px; font-weight: 600; letter-spacing: 5px; }
+  .group-block { margin-top: 14px; }
+  .group-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 7px; }
+  .group-name { color: var(--pc, var(--sub)); font-size: 13px; font-weight: 600; }
   .group-count { color: var(--sub); font-size: 12px; }
-  .cand-more { margin-top: 7px; }
+  .cand-more { margin-top: 8px; }
   .cand-more summary { cursor: pointer; color: var(--sub); font-size: 13px; }
   .cand-more .cand-list { margin-top: 8px; }
 
   .base-list { display: flex; flex-direction: column; gap: 6px; }
   .base-item {
-    display: flex; gap: 12px; align-items: baseline;
-    padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+    display: flex; gap: 12px; align-items: center;
+    padding: 8px 12px; border: 1px solid #e6dcc6; border-radius: 12px; background: rgba(255, 255, 255, .8);
   }
   .base-item.top { border-color: #cdb98d; background: #fffdf4; }
   .base-rank { color: var(--sub); font-size: 12px; width: 28px; flex: none; }
-  .base-item .base-ch { font-size: 26px; min-width: 34px; }
+  .base-item .base-ch { font-size: 26px; width: 44px; height: 44px; }
   .base-meta { flex: 1; min-width: 0; font-size: 13px; color: var(--sub); }
   .base-meta b { color: var(--ink); font-weight: 600; }
   .base-meta .sub { font-size: 12px; }
-  footer { color: var(--sub); font-size: 12px; text-align: center; margin-top: 24px; line-height: 1.9; }
-  .modes { display: flex; gap: 8px; margin-bottom: 16px; }
+
+  footer { color: rgba(238, 232, 216, .62); font-size: 12px; text-align: center; margin-top: 26px; line-height: 1.95; }
+
+  /* ---------- 模式切换 ---------- */
+  .modes { display: flex; gap: 10px; margin-bottom: 18px; }
   .modes button {
-    flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); color: var(--sub); font-size: 14px; min-height: 44px;
+    flex: 1; padding: 13px 10px; min-height: 50px; border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    background: rgba(255, 253, 246, .10); color: rgba(255, 255, 255, .8);
+    font-size: 15px; font-weight: 700; letter-spacing: 2px;
+    box-shadow: none;
   }
-  .modes button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; background: #fffdf4; }
+  .modes button.on {
+    background: linear-gradient(180deg, #fffdf6, #f6eeda);
+    color: #23423a; border-color: rgba(255, 255, 255, .55);
+    box-shadow: 0 10px 24px rgba(3, 18, 15, .38);
+  }
+
+  /* ---------- 单机练习 ---------- */
   .field { display: flex; gap: 8px; align-items: center; color: var(--sub); font-size: 13px; }
-  .field select {
-    font-family: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line);
-    border-radius: 8px; background: #fff; color: var(--ink); min-height: 40px;
-  }
-  .practice-score { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; margin-bottom: 10px; color: var(--sub); font-size: 13px; }
-  .practice-score b { color: var(--accent); font-size: 16px; }
-  .practice-board { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .practice-score { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; margin-bottom: 12px; color: var(--sub); font-size: 13px; }
+  .practice-score b { color: var(--accent); font-size: 17px; }
+  .practice-board { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .practice-board .slot {
-    padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff;
-    display: flex; gap: 8px; align-items: baseline;
+    padding: 9px 18px 11px; border-radius: 16px;
+    background: linear-gradient(180deg, #fffdf6, #f4eddb);
+    border: 1px solid #e2d7bd;
+    box-shadow: 0 7px 16px rgba(90, 70, 40, .12), inset 0 1px 0 #fff;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
   }
-  .practice-board .slot small { color: var(--sub); font-size: 12px; }
-  .practice-board .slot b { font-size: 24px; color: var(--accent); font-weight: 600; }
-  .practice-board .slot.mine b { color: var(--good); }
-  .clue-card .clue-answer { margin-top: 6px; font-size: 13px; color: var(--sub); }
+  .practice-board .slot small { color: var(--sub); font-size: 11px; letter-spacing: 1px; }
+  .practice-board .slot b { font: 700 30px/1.2 "Songti SC", "STSong", "SimSun", serif; color: var(--teal); }
+  .practice-board .slot.mine b { color: #a9791b; }
+  .practice-board .slot.q {
+    border: 2px dashed #d9ba79; background: linear-gradient(180deg, #fffdf3, #f4e7c8);
+  }
+  .practice-board .slot.q b { color: #c69a3c; font-size: 38px; }
+  .clue-card .clue-answer { margin-top: 7px; font-size: 13px; color: var(--sub); }
   .clue-card .clue-answer b { color: var(--ink); }
-  .answer-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-  .answer-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .answer-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .answer-card {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 11px 12px 9px; min-width: 82px;
+    border-radius: 15px; border: 1px solid #e2d7bd; border-top: 4px solid var(--pc, #d9cdb2);
+    background: linear-gradient(180deg, #fffdf6, #f7f1e2);
+    box-shadow: 0 6px 14px rgba(90, 70, 40, .10), inset 0 1px 0 #fff;
+  }
   .answer-card span { font-size: 12px; color: var(--sub); }
   .answer-card .judge { font-size: 12px; color: var(--sub); min-height: 16px; }
   .answer-card.hit input { border-color: #9fcbb2; background: #eef8f1; }
   .answer-card.miss input { border-color: #e6c3aa; background: #fdf2ea; }
   .answer-card.own input { border-color: #cdb98d; background: #fffdf4; }
-  .judge.hit { color: var(--good); }
+  .judge.hit { color: var(--good); font-weight: 600; }
   .judge.miss { color: var(--warn); }
-  .practice-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  @media (max-width: 520px) {
-    .wrap { padding: 18px 12px 48px; }
-    header h1 { font-size: 22px; }
-    .cand .ch { font-size: 26px; min-width: 38px; }
-    .clue-pair { font-size: 21px; }
-    input.pair-input { width: 102px; }
-    .base-ch { font-size: 28px; }
+  .practice-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 16px 12px 44px; }
+    header.board-head { padding: 14px; gap: 12px; }
+    header h1 { font-size: 21px; }
+    .logo .tile { width: 34px; height: 38px; font-size: 21px; }
+    .card { padding: 15px 13px 17px; border-radius: 16px; }
+    .cand .ch { min-width: 40px; height: 42px; font-size: 24px; }
+    .clue-pair i { width: 32px; height: 36px; font-size: 20px; }
+    input.pair-input { width: 118px; }
+    .base-ch { width: 48px; height: 48px; font-size: 26px; }
+    .target-tile { width: 64px; height: 64px; font-size: 34px; }
+    .modes button { font-size: 14px; letter-spacing: 1px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>猜字解底 · 求解器</h1>
-    <p>求解器：出提示、猜字解底，只留下<b>能解出底</b>的候选；单机练习：没朋友时自己玩一局。词库 13.3 万双字词，全部在本机计算，可离线使用。</p>
+  <header class="board-head">
+    <div class="logo" aria-hidden="true">
+      <span class="tile">猜</span><span class="tile">字</span><span class="tile">解</span><span class="tile">底</span>
+      <span class="arrow">→</span><span class="tile q">?</span>
+    </div>
+    <div class="head-text">
+      <h1>猜字解底 · 求解器</h1>
+      <p>求解器：出提示、猜字解底，只留下<b>能解出底</b>的候选；单机练习：没朋友时自己玩一局。词库 13.3 万双字词，全部在本机计算，可离线使用。</p>
+    </div>
   </header>
 
   <div class="modes" id="mode-switch" role="tablist">
@@ -216,7 +434,7 @@
   </div>
 
   <div id="solver-view">
-  <section class="card">
+  <section class="card c-hint">
     <h2>① 出提示 <span class="tag">我的隐藏字 → 少有多解的提示组合</span></h2>
     <div class="row">
       <input id="my-char" inputmode="text" placeholder="字" aria-label="我的隐藏字">
@@ -236,11 +454,24 @@
     <div id="clue-out" class="results"><div class="empty">输入你的隐藏字后点找提示</div></div>
   </section>
 
-  <section class="card">
+  <section class="card c-solve">
     <h2>② 猜字 + 解底 <span class="tag">公共字 + 我的字 + 别人的提示 → 能解出底的隐藏字和底</span></h2>
+    <div class="target">
+      <div class="target-tile" id="base-target">?</div>
+      <div class="target-meta">
+        <b>中央谜底</b>
+        <span id="base-target-note">填好下面的公共字、我的字和对手提示，点「猜字 + 解底」</span>
+      </div>
+    </div>
     <div class="base-fields">
-      <label>公共字 <input id="public-char" inputmode="text" placeholder="公" aria-label="公共字"></label>
-      <label>我的隐藏字 <input id="base-mine" inputmode="text" placeholder="我" aria-label="我的隐藏字（猜字解底）"></label>
+      <label class="field-card pub">
+        <span class="fc-label">公共字 <i>免费线索</i></span>
+        <input id="public-char" inputmode="text" placeholder="公" aria-label="公共字">
+      </label>
+      <label class="field-card mine">
+        <span class="fc-label">我的隐藏字 <i>我自己那张</i></span>
+        <input id="base-mine" inputmode="text" placeholder="我" aria-label="我的隐藏字（猜字解底）">
+      </label>
     </div>
     <div id="guess-rows"></div>
     <div class="row">
@@ -256,7 +487,7 @@
   </div>
 
   <div id="practice-view" hidden>
-    <section class="card">
+    <section class="card c-practice">
       <h2>单机练习 <span class="tag">没朋友时自己练一局：猜隐藏字 + 解底，共 5 轮</span></h2>
       <div class="row">
         <button id="practice-start" class="primary">开始新的一局</button>
@@ -361,6 +592,24 @@
   }
 
   function b(text) { return el("b", null, text); }
+
+  function pairTiles(a, c) {
+    var wrap = el("span", "clue-pair");
+    wrap.appendChild(el("i", null, a));
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(el("i", null, c));
+    return wrap;
+  }
+
+  var targetTile = document.getElementById("base-target");
+  var targetNote = document.getElementById("base-target-note");
+
+  function setTarget(ch, kind, note) {
+    if (!targetTile) return;
+    targetTile.textContent = ch || "?";
+    targetTile.className = "target-tile" + (ch ? (kind === "suspect" ? " suspect" : " found") : "");
+    if (targetNote) targetNote.textContent = note;
+  }
 
   function rich(parts) {
     var frag = document.createDocumentFragment();
@@ -511,7 +760,7 @@
       var unique = !r.real.length && !r.weak.length;
       var card = el("div", "clue-card" + (r.real.length ? "" : " unique"));
       var head = el("div", "clue-head");
-      head.appendChild(el("span", "clue-pair", r.a + " " + r.b));
+      head.appendChild(pairTiles(r.a, r.b));
       head.appendChild(el("span", "badge" + (unique || !r.real.length ? " ok" : " warn"),
         unique ? "唯一解" : (r.real.length ? "有 " + r.real.length + " 个真实对手" : "无常见对手")));
       head.appendChild(el("span", "badge", "第 " + (i + 1) + " 推荐"));
@@ -576,8 +825,12 @@
   var baseMineInput = document.getElementById("base-mine");
 
   function addGuessRow() {
-    var row = el("div", "pair-row");
-    row.appendChild(el("span", "idx", "对手 " + (guessRows.children.length + 1)));
+    var n = guessRows.children.length + 1;
+    var row = el("div", "pair-row p" + (((n - 1) % 6) + 1));
+    var idx = el("span", "idx");
+    idx.appendChild(el("i", null, String(n)));
+    idx.appendChild(el("span", null, "对手"));
+    row.appendChild(idx);
     var inp = document.createElement("input");
     inp.className = "pair-input";
     inp.placeholder = "两个提示字";
@@ -764,10 +1017,10 @@
 
   function renderGroupBlock(host, state, baseChar) {
     var g = state.group, sols = state.sols;
-    var block = el("div", "group-block");
+    var block = el("div", "group-block p" + (((g.idx - 1) % 6) + 1));
     var head = el("div", "group-head");
     head.appendChild(el("span", "group-name", "对手 " + g.idx));
-    head.appendChild(el("span", "group-pair", g.pair.split("").join(" ")));
+    head.appendChild(pairTiles(g.pair.charAt(0), g.pair.charAt(1)));
     if (sols.length === 1) head.appendChild(el("span", "badge ok", "唯一"));
     head.appendChild(el("span", "group-count", sols.length + " 个候选能解底"));
     block.appendChild(head);
@@ -861,10 +1114,10 @@
       renderGroupBlock(body, st, r.base.char);
     });
     r.missed.forEach(function (g) {
-      var block = el("div", "group-block");
+      var block = el("div", "group-block p" + (((g.idx - 1) % 6) + 1));
       var head = el("div", "group-head");
       head.appendChild(el("span", "group-name", "对手 " + g.idx));
-      head.appendChild(el("span", "group-pair", g.pair.split("").join(" ")));
+      head.appendChild(pairTiles(g.pair.charAt(0), g.pair.charAt(1)));
       head.appendChild(el("span", "badge warn", "未对上"));
       block.appendChild(head);
       block.appendChild(el("div", "status",
@@ -933,10 +1186,10 @@
     }
     var showWeak = document.getElementById("show-weak").checked;
     groups.forEach(function (g) {
-      var card = el("div", "clue-card");
+      var card = el("div", "clue-card p" + (((g.idx - 1) % 6) + 1));
       var head = el("div", "clue-head");
-      head.appendChild(el("span", "clue-pair", g.pair.split("").join(" ")));
       head.appendChild(el("span", "badge", "对手 " + g.idx));
+      head.appendChild(pairTiles(g.pair.charAt(0), g.pair.charAt(1)));
       head.appendChild(el("span", "badge", g.raw.length + " 个候选"));
       card.appendChild(head);
       var strong = g.raw.filter(function (c) { return c.minF >= STRONG_F; });
@@ -968,6 +1221,7 @@
     var status = document.getElementById("guess-status");
     out.innerHTML = "";
     status.textContent = "计算中…";
+    setTarget("", null, "正在算…");
 
     var p = readChar(publicInput);
     var m = readChar(baseMineInput);
@@ -993,6 +1247,7 @@
 
     if (!known.length) {
       status.textContent = "未加底的约束";
+      setTarget("", null, "先填公共字或我的字，谜底才会出现");
       notes.forEach(function (note) { out.appendChild(el("div", "status", note)); });
       renderPlain(groups, out);
       return;
@@ -1076,6 +1331,7 @@
 
       if (!results.length) {
         if (partial.length) {
+          setTarget(partial[0].base.char, "suspect", "疑似底：有组对不上，先核对那一组");
           partial.slice(0, MAX_SUSPECTS).forEach(function (r, i) {
             renderSuspectedBaseCard(out, r, p, m, known, i === 0, groups.length);
           });
@@ -1084,6 +1340,7 @@
           }
           return;
         }
+        setTarget("", null, "这些提示字拼不出任何一个共同的底");
         out.appendChild(el("div", "empty", "这些提示字拼不出任何一个共同的底"));
         out.appendChild(el("div", "status", "可以检查公共字、我的字和提示字；或者少填一组，先看哪些字能解底。"));
         if (groups.length) {
@@ -1095,6 +1352,11 @@
           out.appendChild(dbg);
         }
         return;
+      }
+
+      if (results.length) {
+        setTarget(results[0].base.char, "found",
+          results.length === 1 ? "唯一能同时对上所有提示组的底" : "共 " + results.length + " 个底候选，这是首选");
       }
 
       if (!groups.length) {
@@ -1308,16 +1570,16 @@
     out.appendChild(score);
 
     var board = el("div", "practice-board");
-    board.appendChild(practiceSlot("中央谜底", cur.submitted ? cur.X : "?", cur.submitted ? "mine" : ""));
+    board.appendChild(practiceSlot("中央谜底", cur.submitted ? cur.X : "?", cur.submitted ? "mine" : "q"));
     board.appendChild(practiceSlot("公共字", cur.P, ""));
     board.appendChild(practiceSlot("我的字", cur.M, "mine"));
     out.appendChild(board);
 
     cur.opps.forEach(function (g, i) {
-      var card = el("div", "clue-card" + (cur.submitted ? " unique" : ""));
+      var card = el("div", "clue-card p" + (i + 1) + (cur.submitted ? " unique" : ""));
       var head = el("div", "clue-head");
       head.appendChild(el("span", "group-name", "对手 " + (i + 1)));
-      head.appendChild(el("span", "clue-pair", g.a + " " + g.b));
+      head.appendChild(pairTiles(g.a, g.b));
       if (cur.submitted) head.appendChild(el("span", "badge ok", "真身 " + g.char));
       card.appendChild(head);
       card.appendChild(el("div", "clue-answer", "哪一个字，能分别与它们组词？"));
@@ -1326,7 +1588,7 @@
 
     var grid = el("div", "answer-grid");
     for (var i = 0; i < practice.players; i++) {
-      var wrap = el("label", "answer-card");
+      var wrap = el("label", "answer-card " + (i === 0 ? "p6" : "p" + i));
       wrap.appendChild(el("span", null, cur.submitted ? "作答 " + (i + 1) : "作答卡 " + (i + 1)));
       var inp = document.createElement("input");
       inp.inputMode = "text";
@@ -1340,7 +1602,8 @@
         if (res) {
           judge.textContent = res.text;
           judge.className = "judge " + (res.hit ? "hit" : "miss");
-          wrap.className = "answer-card " + (res.hit ? "hit" : (res.own ? "own" : "miss"));
+          wrap.className = "answer-card " + (i === 0 ? "p6" : "p" + i) +
+            (res.hit ? " hit" : (res.own ? " own" : " miss"));
         }
       }
       wrap.appendChild(judge);

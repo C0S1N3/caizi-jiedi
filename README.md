@@ -2,7 +2,7 @@
 
 A self-contained word-game solver for **猜字解底** (guess the hidden character, then the central answer). No install, no network, no account — open the page and type.
 
-**Live demo:** [GitHub Pages](https://c0sin3.github.io/caizi-jiedi/)
+**Live demo:** [Qoder Sites](https://caizi-jiedi-f9d6h843g0z.qoder.zone/) · [GitHub Pages](https://c0sin3.github.io/caizi-jiedi/)
 
 [简体中文 README](README.zh-CN.md)
 
@@ -41,6 +41,7 @@ The dictionary holds **133,343** two-character words with frequencies: primarily
 ## Notes
 
 - The page follows the order of a round: give your own hints first, then use the shared character, your hidden character, and the opponents' hints to guess and solve; leave extra opponent rows blank.
+- The interface follows the physical game: the central answer sits in a gold "?" tile that fills in when a base is found, and every opponent keeps one player color (blue, green, red, yellow, purple).
 - Practice mode shares the same dictionary and decision logic as the solver, so every deal can be reasoned out with the solver's approach.
 - Single file, no dependencies, no tracking, no requests of any kind.
 - Candidates are merely characters that "make sense in the dictionary"; they are not guaranteed to be the one the other player had in mind — keep judging with the context.
